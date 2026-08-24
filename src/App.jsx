@@ -14,8 +14,18 @@ import ToastContainer from './components/Toast';
 import EmployeeAvatar from './components/EmployeeAvatar';
 import Pagination from './components/Pagination';
 import LoginView from './components/LoginView';
+import SupabaseConfigModal from './components/SupabaseConfigModal';
 
 import { INITIAL_EMPLOYEES, DEPARTMENTS, BLOOD_GROUPS } from './data/employeesData';
+import {
+  isSupabaseConfigured,
+  fetchEmployeesFromSupabase,
+  insertEmployeeToSupabase,
+  updateEmployeeInSupabase,
+  deleteEmployeeFromSupabase,
+  subscribeToEmployeesRealtime,
+  mapDbToEmployee
+} from './utils/supabase';
 import { Layers, Search, X, Droplet, Activity, ArrowUpDown, Grid, Table as TableIcon, Users, UserPlus, Code, Palette, Database, Briefcase, Heart, Building2 } from 'lucide-react';
 
 export default function App() {
@@ -135,6 +145,77 @@ export default function App() {
   const [deletingEmployee, setDeletingEmployee] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isCloudinaryModalOpen, setIsCloudinaryModalOpen] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(() => isSupabaseConfigured());
+  const [isDbLoading, setIsDbLoading] = useState(false);
+
+  // Initial Load from Supabase Cloud Database & Live Realtime Sync
+  useEffect(() => {
+    let channel = null;
+
+    const initSupabase = async () => {
+      if (!isSupabaseConfigured()) {
+        setIsSupabaseConnected(false);
+        return;
+      }
+
+      setIsDbLoading(true);
+      try {
+        const res = await fetchEmployeesFromSupabase();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setEmployees(res.data);
+          setIsSupabaseConnected(true);
+          if (res.isSeeded) {
+            showToast('Initialized Supabase cloud database with team records!', 'success');
+          }
+        }
+      } catch (err) {
+        console.error('Supabase initial fetch exception:', err);
+      } finally {
+        setIsDbLoading(false);
+      }
+
+      // Realtime subscription across all connected clients on Vercel
+      channel = subscribeToEmployeesRealtime((payload) => {
+        const { eventType, new: newRow, old: oldRow } = payload;
+        if (eventType === 'INSERT' && newRow) {
+          const newEmp = mapDbToEmployee(newRow);
+          setEmployees(prev => {
+            const alreadyExists = prev.some(e => (e._id && e._id === newEmp._id) || (e.id !== 'Not Provided' && e.id === newEmp.id));
+            if (alreadyExists) return prev;
+            return [newEmp, ...prev];
+          });
+          showToast(`⚡ Live update: Added ${newEmp.name}`, 'info');
+        } else if (eventType === 'UPDATE' && newRow) {
+          const updatedEmp = mapDbToEmployee(newRow);
+          setEmployees(prev => prev.map(e => {
+            const isMatch = (e._id && updatedEmp._id && e._id === updatedEmp._id) || (e.id !== 'Not Provided' && e.id === updatedEmp.id);
+            return isMatch ? { ...e, ...updatedEmp } : e;
+          }));
+          if (viewingEmployee?.id === updatedEmp.id || viewingEmployee?._id === updatedEmp._id) {
+            setViewingEmployee(updatedEmp);
+          }
+        } else if (eventType === 'DELETE' && oldRow) {
+          setEmployees(prev => prev.filter(e => {
+            if (oldRow.internal_id && e._id === oldRow.internal_id) return false;
+            if (oldRow.emp_id && e.id === oldRow.emp_id) return false;
+            return true;
+          }));
+          if (viewingEmployee?._id === oldRow.internal_id || viewingEmployee?.id === oldRow.emp_id) {
+            setViewingEmployee(null);
+          }
+        }
+      });
+    };
+
+    initSupabase();
+
+    return () => {
+      if (channel) {
+        channel.unsubscribe();
+      }
+    };
+  }, []);
 
   // Toast notification state
   const [toasts, setToasts] = useState([]);
@@ -282,6 +363,17 @@ export default function App() {
     setIsAddModalOpen(false);
     showToast(`Created profile for ${newEmp.name}`, 'success');
     addActivityLog("Employee Created", `Added ${newEmp.name} (${newEmp.department})`, "success");
+
+    // Push to Supabase Cloud Database (syncs live to all connected devices)
+    if (isSupabaseConfigured()) {
+      insertEmployeeToSupabase(newEmp)
+        .then(res => {
+          if (!res.success) {
+            console.warn('Supabase cloud insert warning:', res.error);
+          }
+        })
+        .catch(err => console.error("Supabase insert error:", err));
+    }
   };
 
   const handleUpdateEmployee = (updatedEmpData) => {
@@ -299,12 +391,27 @@ export default function App() {
     setEditingEmployee(null);
     showToast(`Updated details for ${processedEmp.name}`, 'success');
     addActivityLog("Employee Updated", `Updated ${processedEmp.name}'s profile`, "info");
+
+    // Push update to Supabase Cloud Database
+    if (isSupabaseConfigured()) {
+      updateEmployeeInSupabase(processedEmp)
+        .then(res => {
+          if (!res.success) {
+            console.warn('Supabase cloud update warning:', res.error);
+          }
+        })
+        .catch(err => console.error("Supabase update error:", err));
+    }
   };
 
   const handleUpdateEmployeePhoto = (employeeId, newPhotoUrl) => {
     setEmployees(prev => prev.map(emp => {
       if (emp.id === employeeId || emp._id === employeeId) {
-        return { ...emp, pic: newPhotoUrl };
+        const updated = { ...emp, pic: newPhotoUrl };
+        if (isSupabaseConfigured()) {
+          updateEmployeeInSupabase(updated).catch(err => console.error("Supabase photo update error:", err));
+        }
+        return updated;
       }
       return emp;
     }));
@@ -328,11 +435,25 @@ export default function App() {
       'Undo',
       () => {
         setEmployees(prev => [deleted, ...prev]);
+        if (isSupabaseConfigured()) {
+          insertEmployeeToSupabase(deleted).catch(err => console.error("Supabase restore error:", err));
+        }
         addActivityLog("Undo Delete", `Restored ${deleted.name}`, "info");
         showToast(`Restored ${deleted.name}`, 'info');
       }
     );
     addActivityLog("Employee Deleted", `Removed ${deleted.name} (${deleted.id})`, "danger");
+
+    // Delete in Supabase Cloud Database
+    if (isSupabaseConfigured()) {
+      deleteEmployeeFromSupabase(deleted)
+        .then(res => {
+          if (!res.success) {
+            console.warn('Supabase cloud delete warning:', res.error);
+          }
+        })
+        .catch(err => console.error("Supabase delete error:", err));
+    }
   };
 
   const handleResetData = () => {
@@ -373,6 +494,8 @@ export default function App() {
         onAddEmployee={() => setIsAddModalOpen(true)}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+        isSupabaseConnected={isSupabaseConnected}
       />
 
       {/* Main Content Area */}
@@ -942,6 +1065,16 @@ export default function App() {
         isOpen={isCloudinaryModalOpen}
         onClose={() => setIsCloudinaryModalOpen(false)}
         onConfigSaved={(msg) => showToast(msg, 'success')}
+      />
+
+      {/* Supabase Realtime Cloud Database Configuration Modal */}
+      <SupabaseConfigModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+        onConfigSaved={() => {
+          setIsSupabaseConnected(isSupabaseConfigured());
+          showToast('Supabase connection updated!', 'success');
+        }}
       />
 
       {/* Toasts */}

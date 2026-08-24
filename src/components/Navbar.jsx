@@ -9,7 +9,9 @@ export default function Navbar({
   totalEmployees,
   onAddEmployee,
   currentUser,
-  onLogout
+  onLogout,
+  onOpenSupabaseModal,
+  isSupabaseConnected
 }) {
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -79,6 +81,26 @@ export default function Navbar({
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Supabase Cloud Live Sync Indicator / Button */}
+            <button
+              onClick={onOpenSupabaseModal}
+              title={isSupabaseConnected ? "Supabase Live Realtime Cloud DB Connected" : "Connect Supabase Live Cloud Database"}
+              className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                isSupabaseConnected
+                  ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                  : 'bg-slate-100/80 hover:bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+            >
+              <span className="relative flex h-2 w-2">
+                {isSupabaseConnected && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isSupabaseConnected ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
+              </span>
+              <span className="hidden md:inline">
+                {isSupabaseConnected ? 'Cloud DB Live' : 'Connect Cloud DB'}
+              </span>
+            </button>
             {/* Add Employee CTA */}
             <button
               onClick={onAddEmployee}
