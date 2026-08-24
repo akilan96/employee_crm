@@ -29,11 +29,11 @@ import {
 import { Layers, Search, X, Droplet, Activity, ArrowUpDown, Grid, Table as TableIcon, Users, UserPlus, Code, Palette, Database, Briefcase, Heart, Building2 } from 'lucide-react';
 
 export default function App() {
-  // Theme state: dark / light
+  // Theme state: dark / light (Default: 'dark')
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('neekan_crm_theme');
     if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return 'dark';
   });
 
   useEffect(() => {
