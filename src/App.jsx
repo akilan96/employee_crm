@@ -101,18 +101,13 @@ export default function App() {
   const [sortBy, setSortBy] = useState('exp-desc');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
 
-  // Authentication State
+  // Authentication State (Default: null so new users must login first)
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('neekan_crm_auth');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
-    return {
-      username: 'editor',
-      role: 'editor',
-      displayName: 'Editor',
-      canDelete: true
-    };
+    return null;
   });
 
   const handleLogin = (user) => {
