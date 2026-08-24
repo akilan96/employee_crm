@@ -15,30 +15,63 @@ export default function Navbar({
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Brand Name */}
-          <div className="flex items-center">
-            <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white select-none">
-              Neekan Consulting LLP
-            </h1>
+          {/* Brand & Partner Logos */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Logos Container */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Neekan Logo Card */}
+              <div
+                className="bg-white px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-center shrink-0 hover:shadow-sm transition-all"
+                title="Neekan Consulting LLP"
+              >
+                <img
+                  src="/neekan-logo.png"
+                  alt="Neekan Consulting LLP"
+                  className="h-4 sm:h-5 w-auto object-contain"
+                />
+              </div>
+
+              {/* Minimal Divider / Plus */}
+              <span className="text-slate-300 dark:text-slate-600 font-bold text-xs select-none">
+                +
+              </span>
+
+              {/* UDU Labs Logo Card */}
+              <div
+                className="bg-white px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-center shrink-0 hover:shadow-sm transition-all"
+                title="UDU Labs"
+              >
+                <img
+                  src="/udu_labs.png"
+                  alt="UDU Labs"
+                  className="h-4 sm:h-5 w-auto object-contain"
+                />
+              </div>
+            </div>
+
+            {/* Brand Title */}
+            <div className="flex items-center select-none">
+              <h1 className="text-xs sm:text-sm md:text-base font-black tracking-tight text-slate-900 dark:text-white">
+                Neekan Consulting LLP &amp; UDU Labs
+              </h1>
+            </div>
           </div>
 
           {/* Module Navigation Bar (Desktop) */}
           <div className="hidden sm:flex items-center p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <button
               onClick={() => setActiveModule('employees')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                activeModule === 'employees'
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeModule === 'employees'
                   ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
+                }`}
             >
               <Users className="w-3.5 h-3.5" />
               <span>Employee Directory</span>
-              <span className={`px-1.5 py-0.2 text-[11px] font-bold rounded-full ${
-                activeModule === 'employees'
+              <span className={`px-1.5 py-0.2 text-[11px] font-bold rounded-full ${activeModule === 'employees'
                   ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200'
                   : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-              }`}>
+                }`}>
                 {totalEmployees}
               </span>
             </button>
@@ -60,22 +93,20 @@ export default function Navbar({
             {currentUser && (
               <div className="flex items-center gap-1.5 pl-1.5 pr-1 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-1.5">
-                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-bold ${
-                    currentUser.role === 'editor'
+                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-bold ${currentUser.role === 'editor'
                       ? 'bg-emerald-500 text-white shadow-xs'
                       : 'bg-indigo-500 text-white shadow-xs'
-                  }`}>
+                    }`}>
                     {currentUser.username[0].toUpperCase()}
                   </div>
                   <div className="hidden lg:block text-left leading-none pr-1">
                     <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
                       {currentUser.username}
                     </span>
-                    <span className={`text-[9px] font-bold uppercase ${
-                      currentUser.role === 'editor'
+                    <span className={`text-[9px] font-bold uppercase ${currentUser.role === 'editor'
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : 'text-indigo-600 dark:text-indigo-400'
-                    }`}>
+                      }`}>
                       {currentUser.role === 'editor' ? 'Editor' : 'User'}
                     </span>
                   </div>
