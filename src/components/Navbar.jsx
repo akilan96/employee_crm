@@ -11,7 +11,8 @@ export default function Navbar({
   currentUser,
   onLogout,
   onOpenSupabaseModal,
-  isSupabaseConnected
+  isSupabaseConnected,
+  onOpenShaktiDB
 }) {
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -63,17 +64,19 @@ export default function Navbar({
           <div className="hidden sm:flex items-center p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <button
               onClick={() => setActiveModule('employees')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeModule === 'employees'
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                activeModule === 'employees'
                   ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+              }`}
             >
               <Users className="w-3.5 h-3.5" />
               <span>Employee Directory</span>
-              <span className={`px-1.5 py-0.2 text-[11px] font-bold rounded-full ${activeModule === 'employees'
+              <span className={`px-1.5 py-0.2 text-[11px] font-bold rounded-full ${
+                activeModule === 'employees'
                   ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200'
                   : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                }`}>
+              }`}>
                 {totalEmployees}
               </span>
             </button>
@@ -81,6 +84,18 @@ export default function Navbar({
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Route Link to ShaktiDB UI */}
+            {onOpenShaktiDB && (
+              <button
+                onClick={onOpenShaktiDB}
+                title="Open ShaktiDB Indigenous Database UI"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-cyan-500/15 to-teal-500/15 hover:from-cyan-500/25 hover:to-teal-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-400/40 transition-all active:scale-95"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                <span>ShaktiDB UI</span>
+              </button>
+            )}
+
             {/* Supabase Cloud Live Sync Indicator / Button */}
             <button
               onClick={onOpenSupabaseModal}

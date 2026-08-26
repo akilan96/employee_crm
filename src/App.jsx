@@ -15,6 +15,7 @@ import EmployeeAvatar from './components/EmployeeAvatar';
 import Pagination from './components/Pagination';
 import LoginView from './components/LoginView';
 import SupabaseConfigModal from './components/SupabaseConfigModal';
+import ShaktiDBView from './components/ShaktiDBView';
 
 import { INITIAL_EMPLOYEES, DEPARTMENTS, BLOOD_GROUPS } from './data/employeesData';
 import {
@@ -87,7 +88,44 @@ export default function App() {
     localStorage.setItem('neekan_crm_employees', JSON.stringify(employees));
   }, [employees]);
 
-  // Active Module: 'employees' | 'analytics' | 'operations'
+  // Dedicated Route Handling for ShaktiDB (/shaktidb or #/shaktidb) vs Internal CRM (/)
+  const getRoute = () => {
+    if (typeof window === 'undefined') return '/';
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    const search = new URLSearchParams(window.location.search).get('route');
+    if (path === '/shaktidb' || path.startsWith('/shaktidb') || hash === '#/shaktidb' || hash.startsWith('#/shaktidb') || search === 'shaktidb') {
+      return '/shaktidb';
+    }
+    return '/';
+  };
+
+  const [currentRoute, setCurrentRoute] = useState(getRoute);
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentRoute(getRoute());
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
+
+  const navigateTo = (path) => {
+    if (typeof window !== 'undefined') {
+      if (window.history.pushState) {
+        window.history.pushState(null, '', path);
+        setCurrentRoute(getRoute());
+      } else {
+        window.location.hash = path;
+      }
+    }
+  };
+
+  // CRM Active Module: 'employees' | 'analytics' | 'operations' | 'photo-generator'
   const [activeModule, setActiveModule] = useState('employees');
 
   // Active Section Filter: 'ALL' | 'Software Engineer' | 'UI/UX' | 'DBA' | 'Management'
@@ -467,7 +505,22 @@ export default function App() {
     return employees.filter(e => e.department === deptKey || (deptKey === 'UI/UX' && e.department === 'UI/UX & Digital Marketing')).slice(0, 4);
   };
 
-  // If not logged in, show Login Screen
+  // Dedicated Route: If currentRoute is '/shaktidb', render the standalone ShaktiDB Landing Page Route
+  if (currentRoute === '/shaktidb') {
+    return (
+      <>
+        <ShaktiDBView
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onOpenDirectory={() => navigateTo('/')}
+          onShowToast={(msg, type) => showToast(msg, type)}
+        />
+        <ToastContainer toasts={toasts} />
+      </>
+    );
+  }
+
+  // Internal CRM Route (/): If not logged in, show CRM Login Screen
   if (!currentUser) {
     return (
       <>
@@ -491,6 +544,7 @@ export default function App() {
         onLogout={handleLogout}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
         isSupabaseConnected={isSupabaseConnected}
+        onOpenShaktiDB={() => navigateTo('/shaktidb')}
       />
 
       {/* Main Content Area */}
@@ -992,14 +1046,24 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right: Crafted with heart by AKILAN */}
-            <div className="md:text-right flex items-center justify-center md:justify-end gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
-              <span>Crafted with</span>
-              <Heart className="w-4 h-4 text-rose-500 fill-rose-500 animate-pulse shrink-0" />
-              <span>by</span>
-              <span className="font-extrabold text-slate-900 dark:text-white tracking-wider">
-                AKILAN
-              </span>
+            {/* Right: Crafted with heart by AKILAN & ShaktiDB link */}
+            <div className="md:text-right flex flex-wrap items-center justify-center md:justify-end gap-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
+              <button
+                onClick={() => navigateTo('/shaktidb')}
+                className="text-cyan-600 dark:text-cyan-400 hover:underline font-semibold flex items-center gap-1 text-[11px]"
+              >
+                <span>⚡ ShaktiDB Sovereign UI Portal</span>
+                <span>→</span>
+              </button>
+              <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
+              <div className="flex items-center gap-1.5">
+                <span>Crafted with</span>
+                <Heart className="w-4 h-4 text-rose-500 fill-rose-500 animate-pulse shrink-0" />
+                <span>by</span>
+                <span className="font-extrabold text-slate-900 dark:text-white tracking-wider">
+                  AKILAN
+                </span>
+              </div>
             </div>
           </div>
         </div>
