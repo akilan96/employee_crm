@@ -7,6 +7,15 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    open: true
+    open: true,
+    watch: {
+      ignored: ['**/.wwebjs_auth/**', '**/server/**', '**/.git/**']
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true
+      }
+    }
   }
 });

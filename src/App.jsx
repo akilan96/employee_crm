@@ -16,6 +16,7 @@ import Pagination from './components/Pagination';
 import LoginView from './components/LoginView';
 import SupabaseConfigModal from './components/SupabaseConfigModal';
 import ShaktiDBView from './components/ShaktiDBView';
+import EventLandingView from './components/EventLandingView';
 
 import { INITIAL_EMPLOYEES, DEPARTMENTS, BLOOD_GROUPS } from './data/employeesData';
 import {
@@ -88,12 +89,15 @@ export default function App() {
     localStorage.setItem('neekan_crm_employees', JSON.stringify(employees));
   }, [employees]);
 
-  // Dedicated Route Handling for ShaktiDB (/shaktidb or #/shaktidb) vs Internal CRM (/)
+  // Dedicated Route Handling for ShaktiDB (/shaktidb) and Student Workshop (/event) vs Internal CRM (/)
   const getRoute = () => {
     if (typeof window === 'undefined') return '/';
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
     const search = new URLSearchParams(window.location.search).get('route');
+    if (path === '/event' || path.startsWith('/event') || hash === '#/event' || hash.startsWith('#/event') || search === 'event') {
+      return '/event';
+    }
     if (path === '/shaktidb' || path.startsWith('/shaktidb') || hash === '#/shaktidb' || hash.startsWith('#/shaktidb') || search === 'shaktidb') {
       return '/shaktidb';
     }
@@ -504,6 +508,21 @@ export default function App() {
     }
     return employees.filter(e => e.department === deptKey || (deptKey === 'UI/UX' && e.department === 'UI/UX & Digital Marketing')).slice(0, 4);
   };
+
+  // Dedicated Route: If currentRoute is '/event', render the standalone Student Database Workshop Landing Page
+  if (currentRoute === '/event') {
+    return (
+      <>
+        <EventLandingView
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onOpenDirectory={() => navigateTo('/')}
+          onShowToast={(msg, type) => showToast(msg, type)}
+        />
+        <ToastContainer toasts={toasts} />
+      </>
+    );
+  }
 
   // Dedicated Route: If currentRoute is '/shaktidb', render the standalone ShaktiDB Landing Page Route
   if (currentRoute === '/shaktidb') {
