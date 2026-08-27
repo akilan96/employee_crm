@@ -25,9 +25,11 @@ let isClientReady = false;
 let currentQrCodeDataUrl = null;
 let lastStatus = 'INITIALIZING';
 let client = null;
+let lastError = null;
 
 function createWhatsAppClient() {
   try {
+    lastStatus = 'LAUNCHING_BROWSER';
     client = new Client({
       authStrategy: new LocalAuth({
         dataPath: path.join(os.tmpdir(), 'shaktidb_wwebjs_auth')
@@ -45,13 +47,16 @@ function createWhatsAppClient() {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--disable-gpu'
+          '--single-process',
+          '--disable-gpu',
+          '--disable-extensions'
         ]
       }
     });
 
     client.on('qr', async (qr) => {
       lastStatus = 'QR_REQUIRED';
+      lastError = null;
       console.log('📱 WhatsApp Web QR Code generated for +91 96779 65133.');
       try {
         currentQrCodeDataUrl = await qrcode.toDataURL(qr);
@@ -63,6 +68,7 @@ function createWhatsAppClient() {
     client.on('ready', () => {
       isClientReady = true;
       lastStatus = 'READY';
+      lastError = null;
       currentQrCodeDataUrl = null;
       console.log('🚀 WhatsApp Web Client is READY! Linked to Admissions Desk (+91 96779 65133)');
     });
@@ -75,20 +81,26 @@ function createWhatsAppClient() {
     client.on('auth_failure', (msg) => {
       isClientReady = false;
       lastStatus = 'AUTH_FAILURE';
+      lastError = String(msg);
       console.error('❌ WhatsApp Auth failure:', msg);
     });
 
     client.on('disconnected', (reason) => {
       isClientReady = false;
       lastStatus = 'DISCONNECTED';
+      lastError = String(reason);
       console.warn('⚠️ WhatsApp client disconnected:', reason);
     });
 
     client.initialize().catch((err) => {
-      console.warn('⚠️ WhatsApp Web client background init notice:', err.message);
+      lastStatus = 'INIT_ERROR';
+      lastError = err.message;
+      console.error('⚠️ WhatsApp Web client background init error:', err);
     });
   } catch (err) {
-    console.warn('WhatsApp client creation notice:', err.message);
+    lastStatus = 'FATAL_ERROR';
+    lastError = err.message;
+    console.error('WhatsApp client creation error:', err);
   }
 }
 
@@ -100,8 +112,10 @@ app.get('/api/whatsapp-status', (req, res) => {
   res.json({
     ready: isClientReady,
     status: lastStatus,
+    error: lastError,
     qrCode: currentQrCodeDataUrl,
-    organizerNumber: '919677965133'
+    organizerNumber: '919677965133',
+    timestamp: new Date().toISOString()
   });
 });
 

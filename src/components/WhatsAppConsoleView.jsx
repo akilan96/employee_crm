@@ -37,6 +37,7 @@ export default function WhatsAppConsoleView({ theme, toggleTheme, onNavigate, on
 
   // Local registrations
   const [registrations, setRegistrations] = useState([]);
+  const [serverError, setServerError] = useState(null);
   const [resendingId, setResendingId] = useState(null);
 
   const fetchStatus = async () => {
@@ -45,8 +46,10 @@ export default function WhatsAppConsoleView({ theme, toggleTheme, onNavigate, on
       const res = await fetch(API_ENDPOINTS.status);
       if (res.ok) {
         const data = await res.json();
-        setGatewayStatus(data.status);
-        setQrCodeData(data.qr || null);
+        const effectiveStatus = data.ready ? 'READY' : (data.status || 'CHECKING');
+        setGatewayStatus(effectiveStatus);
+        setQrCodeData(data.qrCode || data.qr || null);
+        setServerError(data.error || null);
         setLastChecked(new Date());
       } else {
         setGatewayStatus('SERVER_OFFLINE');
@@ -302,7 +305,7 @@ export default function WhatsAppConsoleView({ theme, toggleTheme, onNavigate, on
                     <div>Engine: Chromium Headless</div>
                   </div>
                 </div>
-              ) : gatewayStatus === 'QR_READY' && qrCodeData ? (
+              ) : qrCodeData ? (
                 <div className="text-center space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
                     Scan this QR code using WhatsApp on +91 96779 65133 to link the Admissions Gateway:
@@ -320,12 +323,15 @@ export default function WhatsAppConsoleView({ theme, toggleTheme, onNavigate, on
                     <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                     <span>Server Status: {gatewayStatus}</span>
                   </div>
-                  <p>
-                    The WhatsApp automation daemon is syncing. If it does not become READY within 10 seconds, run:
-                  </p>
-                  <code className="block p-2 rounded-lg bg-black/80 text-emerald-400 font-mono text-xs">
-                    npm run server
-                  </code>
+                  {serverError ? (
+                    <p className="text-red-500 font-mono text-[11px]">
+                      Error: {serverError}
+                    </p>
+                  ) : (
+                    <p>
+                      The WhatsApp automation daemon is launching Chromium in background. Please wait 10-20 seconds...
+                    </p>
+                  )}
                 </div>
               )}
 
