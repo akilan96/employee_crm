@@ -3,6 +3,7 @@ import cors from 'cors';
 import qrcode from 'qrcode';
 import os from 'os';
 import path from 'path';
+import puppeteer from 'puppeteer';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, MessageMedia } = pkg;
 
@@ -30,16 +31,20 @@ let lastError = null;
 function createWhatsAppClient() {
   try {
     lastStatus = 'LAUNCHING_BROWSER';
+    let execPath = null;
+    try {
+      execPath = puppeteer.executablePath();
+    } catch (e) {
+      console.warn('executablePath lookup note:', e.message);
+    }
+
     client = new Client({
       authStrategy: new LocalAuth({
         dataPath: path.join(os.tmpdir(), 'shaktidb_wwebjs_auth')
       }),
-      webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-js/main/dist/wppconnect-wa.js'
-      },
       puppeteer: {
         headless: true,
+        ...(execPath ? { executablePath: execPath } : {}),
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
