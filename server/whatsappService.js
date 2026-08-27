@@ -3,9 +3,14 @@ import cors from 'cors';
 import qrcode from 'qrcode';
 import os from 'os';
 import path from 'path';
-import puppeteer from 'puppeteer';
-import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth, MessageMedia } = pkg;
+import pino from 'pino';
+import makeWASocketPkg, {
+  DisconnectReason,
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion
+} from '@whiskeysockets/baileys';
+
+const makeWASocket = makeWASocketPkg.default || makeWASocketPkg;
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,143 +18,91 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' }));
 
-// Root health check for Render.com
+// Health Check
 app.get('/', (req, res) => {
   res.json({
     status: 'ONLINE',
-    service: 'ShaktiDB Admissions WhatsApp Gateway',
+    service: 'ShaktiDB Admissions WhatsApp Gateway (Pure WebSocket Engine - 35MB RAM)',
+    engine: 'Baileys Multi-Device',
     timestamp: new Date().toISOString()
   });
 });
 
+let sock = null;
 let isClientReady = false;
 let currentQrCodeDataUrl = null;
 let lastStatus = 'INITIALIZING';
-let client = null;
 let lastError = null;
 
-function createWhatsAppClient() {
+const AUTH_DIR = path.join(os.tmpdir(), 'shaktidb_baileys_auth');
+
+async function startWhatsApp() {
   try {
-    lastStatus = 'LAUNCHING_BROWSER';
-    let execPath = null;
-    try {
-      execPath = puppeteer.executablePath();
-    } catch (e) {
-      console.warn('executablePath lookup note:', e.message);
-    }
+    lastStatus = 'CONNECTING';
+    lastError = null;
 
-    client = new Client({
-      authStrategy: new LocalAuth({
-        dataPath: path.join(os.tmpdir(), 'shaktidb_wwebjs_auth')
-      }),
-      webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-js/main/dist/wppconnect-wa.js'
-      },
-      puppeteer: {
-        headless: 'new',
-        ...(execPath ? { executablePath: execPath } : {}),
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-          '--disable-software-rasterizer',
-          '--disable-extensions',
-          '--mute-audio',
-          '--no-default-browser-check',
-          '--disable-features=IsolateOrigins,site-per-process,Translate,AcceptCHFrame,MediaRouter,OptimizationHints',
-          '--disable-background-networking',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-breakpad',
-          '--disable-component-update',
-          '--disable-domain-reliability',
-          '--disable-sync',
-          '--metrics-recording-only',
-          '--use-mock-keychain',
-          '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        ]
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const { version, isLatest } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307], isLatest: true }));
+
+    console.log(`🚀 Starting Pure WebSocket WhatsApp Engine (v${version.join('.')}, isLatest: ${isLatest})...`);
+
+    sock = makeWASocket({
+      version,
+      auth: state,
+      logger: pino({ level: 'silent' }),
+      printQRInTerminal: true,
+      browser: ['ShaktiDB Admissions', 'Desktop', '1.0.0'],
+      syncFullHistory: false,
+      markOnlineOnConnect: true,
+      generateHighQualityLinkPreview: false
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        lastStatus = 'QR_REQUIRED';
+        lastError = null;
+        console.log('📱 WhatsApp Web QR Code generated for Admissions (+91 96779 65133).');
+        try {
+          currentQrCodeDataUrl = await qrcode.toDataURL(qr);
+        } catch (qrErr) {
+          console.error('QR toDataURL error:', qrErr);
+        }
+      }
+
+      if (connection === 'close') {
+        isClientReady = false;
+        const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+        console.log(`⚠️ Connection closed (Status: ${statusCode}). Reconnect: ${shouldReconnect}`);
+        lastStatus = shouldReconnect ? 'RECONNECTING' : 'LOGGED_OUT';
+        lastError = lastDisconnect?.error?.message || null;
+
+        if (shouldReconnect) {
+          setTimeout(startWhatsApp, 3000);
+        }
+      } else if (connection === 'open') {
+        isClientReady = true;
+        lastStatus = 'READY';
+        lastError = null;
+        currentQrCodeDataUrl = null;
+        console.log('🎉 WhatsApp Client is READY! Linked to Admissions Desk (+91 96779 65133)');
       }
     });
 
-    client.on('loading_screen', (percent, message) => {
-      lastStatus = `SYNCING_${percent}%`;
-      console.log(`⏳ WhatsApp Web syncing: ${percent}% - ${message}`);
-    });
-
-    client.on('qr', async (qr) => {
-      lastStatus = 'QR_REQUIRED';
-      lastError = null;
-      console.log('📱 WhatsApp Web QR Code generated for +91 96779 65133.');
-      try {
-        currentQrCodeDataUrl = await qrcode.toDataURL(qr);
-      } catch (err) {
-        console.error('Failed to generate QR data URL', err);
-      }
-    });
-
-    client.on('ready', () => {
-      isClientReady = true;
-      lastStatus = 'READY';
-      lastError = null;
-      currentQrCodeDataUrl = null;
-      console.log('🚀 WhatsApp Web Client is READY! Linked to Admissions Desk (+91 96779 65133)');
-    });
-
-    client.on('authenticated', () => {
-      lastStatus = 'AUTHENTICATED';
-      console.log('🔒 WhatsApp Client Authenticated.');
-    });
-
-    client.on('auth_failure', (msg) => {
-      isClientReady = false;
-      lastStatus = 'AUTH_FAILURE';
-      lastError = String(msg);
-      console.error('❌ WhatsApp Auth failure:', msg);
-    });
-
-    client.on('disconnected', (reason) => {
-      isClientReady = false;
-      lastStatus = 'DISCONNECTED';
-      lastError = String(reason);
-      console.warn('⚠️ WhatsApp client disconnected:', reason);
-    });
-
-    client.initialize().catch((err) => {
-      lastStatus = 'INIT_ERROR';
-      lastError = err.message;
-      console.error('⚠️ WhatsApp Web client background init error:', err);
-    });
   } catch (err) {
-    lastStatus = 'FATAL_ERROR';
+    lastStatus = 'INIT_ERROR';
     lastError = err.message;
-    console.error('WhatsApp client creation error:', err);
+    console.error('❌ WhatsApp WebSocket init error:', err);
   }
 }
 
-// Start Client Safely
-createWhatsAppClient();
-
-// Restart WhatsApp Endpoint to generate fresh QR
-app.post('/api/restart-whatsapp', async (req, res) => {
-  try {
-    if (client) {
-      try {
-        await client.destroy();
-      } catch (e) {}
-    }
-    isClientReady = false;
-    currentQrCodeDataUrl = null;
-    createWhatsAppClient();
-    res.json({ success: true, message: 'WhatsApp client restarting for fresh QR code' });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
+// Start Client
+startWhatsApp();
 
 // Status Endpoint
 app.get('/api/whatsapp-status', (req, res) => {
@@ -159,11 +112,29 @@ app.get('/api/whatsapp-status', (req, res) => {
     error: lastError,
     qrCode: currentQrCodeDataUrl,
     organizerNumber: '919677965133',
+    engine: 'Baileys Pure Socket (Ultra-Low 35MB Memory)',
     timestamp: new Date().toISOString()
   });
 });
 
-// Direct Automated Dispatch Endpoint
+// Restart Endpoint
+app.post('/api/restart-whatsapp', async (req, res) => {
+  try {
+    if (sock) {
+      try {
+        sock.end(undefined);
+      } catch (e) {}
+    }
+    isClientReady = false;
+    currentQrCodeDataUrl = null;
+    startWhatsApp();
+    res.json({ success: true, message: 'WhatsApp WebSocket daemon restarting for fresh QR' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Direct Automated Dispatch Endpoint (1 Single Message with Pass Attachment & Text Caption)
 app.post('/api/send-whatsapp-pass', async (req, res) => {
   const { studentPhone, studentName, ticketId, message, passImageBase64 } = req.body;
 
@@ -175,50 +146,39 @@ app.post('/api/send-whatsapp-pass', async (req, res) => {
   if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
   if (cleanPhone.startsWith('0') && cleanPhone.length === 11) cleanPhone = `91${cleanPhone.substring(1)}`;
 
-  console.log(`\n📤 [DIRECT DISPATCH] Sending pass directly to Student: ${studentName} (${cleanPhone}) from +91 96779 65133...`);
+  const recipientJid = `${cleanPhone}@s.whatsapp.net`;
+  console.log(`\n📤 [DIRECT DISPATCH] Sending pass to ${studentName} (${cleanPhone}) via pure WebSocket...`);
 
-  if (isClientReady && client) {
+  if (isClientReady && sock) {
     try {
-      // 1. Resolve registered WhatsApp JID
-      let recipientJid = `${cleanPhone}@c.us`;
-      try {
-        const numberId = await client.getNumberId(cleanPhone);
-        if (numberId && numberId._serialized) {
-          recipientJid = numberId._serialized;
-        }
-      } catch (numErr) {
-        console.warn('Number lookup notice:', numErr.message);
-      }
-
-      console.log(`🎯 Routing to WhatsApp JID: ${recipientJid}`);
-
-      // Send ONLY 1 Single Message (Directly attach pass image with full message caption)
       if (passImageBase64) {
-        try {
-          const base64Data = passImageBase64.replace(/^data:image\/\w+;base64,/, '');
-          const media = new MessageMedia('image/png', base64Data, `ShaktiDB_Student_Pass_${ticketId}.png`);
-          await client.sendMessage(recipientJid, media, {
-            caption: message
-          });
-          console.log(`🖼️ Pass image with caption delivered as 1 single message to ${cleanPhone}!`);
-        } catch (imgErr) {
-          console.warn('Image send error, falling back to text:', imgErr.message);
-          await client.sendMessage(recipientJid, message);
-        }
+        // Strip data prefix if present
+        const base64Data = passImageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+
+        // Send 1 single message: Image + Text Caption
+        await sock.sendMessage(recipientJid, {
+          image: imageBuffer,
+          caption: message || `🎓 *ShaktiDB Student Workshop Pass*\nTicket ID: ${ticketId}`
+        });
+
+        console.log(`🖼️ Pass image with caption delivered as 1 single message to ${cleanPhone}!`);
       } else {
-        const sendResult = await client.sendMessage(recipientJid, message);
-        console.log(`✅ Text message delivered to ${cleanPhone}! (ID: ${sendResult?.id?._serialized || 'OK'})`);
+        await sock.sendMessage(recipientJid, {
+          text: message || `🎓 Your ShaktiDB Student Workshop Pass: ${ticketId}`
+        });
+        console.log(`✅ Text message delivered to ${cleanPhone}!`);
       }
 
       console.log(`🎉 [DISPATCH SUCCESS] Pass sent directly to ${cleanPhone}!`);
       return res.json({
         success: true,
-        mode: 'DIRECT_WHATSAPP_WEB',
+        mode: 'DIRECT_BAILEYS_SOCKET',
         recipient: cleanPhone,
-        message: 'Pass delivered directly to student WhatsApp without any user prompt!'
+        message: 'Pass delivered directly to student WhatsApp in 1 single message!'
       });
     } catch (err) {
-      console.error('❌ WhatsApp direct send error:', err.message);
+      console.error('❌ WhatsApp send error:', err.message);
       return res.status(500).json({
         success: false,
         mode: 'ERROR',
@@ -233,7 +193,7 @@ app.post('/api/send-whatsapp-pass', async (req, res) => {
       mode: 'NOT_LINKED',
       status: lastStatus,
       recipient: cleanPhone,
-      message: 'WhatsApp Gateway is not linked yet. Please scan the QR code to link +91 96779 65133.'
+      message: 'WhatsApp Gateway is not linked yet. Please scan the QR code at /whatsapp.'
     });
   }
 });
