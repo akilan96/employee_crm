@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server/whatsappService.js",
+    "postinstall": "npx puppeteer browsers install chrome",
     "dev": "vite",
     "server": "node server/whatsappService.js",
     "build": "vite build",
