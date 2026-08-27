@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import QRCode from 'qrcode';
+import { API_ENDPOINTS } from '../utils/apiConfig';
 import {
   Sparkles,
   Calendar,
@@ -44,7 +46,8 @@ import {
   Shield,
   RotateCw,
   Info,
-  Laptop
+  Laptop,
+  Heart
 } from 'lucide-react';
 
 export default function EventLandingView({
@@ -102,6 +105,7 @@ export default function EventLandingView({
   const [registeredPass, setRegisteredPass] = useState(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState(null);
+  const [passQrUrl, setPassQrUrl] = useState(null);
 
   // Active FAQ Accordion State
   const [activeFaq, setActiveFaq] = useState(0);
@@ -134,7 +138,7 @@ export default function EventLandingView({
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await fetch('/api/whatsapp-status');
+        const res = await fetch(API_ENDPOINTS.status);
         if (res.ok) {
           const data = await res.json();
           setWhatsappGatewayStatus(data.ready ? 'READY' : (data.status || 'QR_REQUIRED'));
@@ -215,241 +219,386 @@ _Dispatched from ShaktiDB Admissions Desk (+91 96779 65133)_
 _Department of CSE, IIT Madras & Pravartak Foundation_`;
   };
 
-  // Generate Canvas PNG Image matching the exact Mobile Ticket layout in user photo
+  // Generate High-Definition Compact Mobile Pass Canvas (1120x1680 HD 2x DPI)
   const generateTicketCanvasImage = (passData) => {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      const width = 640;
-      const height = 1100;
-      canvas.width = width;
-      canvas.height = height;
+      
+      const logicalWidth = 560;
+      const logicalHeight = 840;
+      const scale = 2; // 2x Ultra-HD Retina Pixel Density (1120 x 1680)
 
-      // 1. Background (Clean Card with soft shadow border)
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
+      canvas.width = logicalWidth * scale;
+      canvas.height = logicalHeight * scale;
 
-      // Top Notch background
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(0, 0, width, 50);
+      ctx.scale(scale, scale);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
-      // 2. Phone Notch simulation
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.roundRect(width / 2 - 60, 0, 120, 24, [0, 0, 14, 14]);
-      ctx.fill();
+      const width = logicalWidth;
+      const height = logicalHeight;
 
-      // Speaker & Camera dot
-      ctx.fillStyle = '#334155';
-      ctx.beginPath();
-      ctx.arc(width / 2 + 30, 12, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 3. LIVE Green Pill Badge (Top Left)
-      ctx.fillStyle = '#15803d';
-      ctx.beginPath();
-      ctx.roundRect(36, 60, 84, 28, 14);
-      ctx.fill();
-
-      // Live Dot
+      // 1. Crisp White Card Background with Subtle Border
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(50, 74, 4, 0, Math.PI * 2);
+      ctx.roundRect(0, 0, width, height, 28);
       ctx.fill();
 
-      // Live text
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('LIVE', 62, 78);
-
-      // 4. Header Titles
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.fillText('COMBO WORKSHOP PASS', 36, 112);
-
-      ctx.fillStyle = '#334155';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillText('மாணவர் அனுமதி சீட்டு', 36, 134);
-
-      // 5. Official IIT Madras Pravartak Stamp / Seal (Top Right)
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(width - 70, 95, 38, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(width - 70, 95, 33, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.fillStyle = '#64748b';
-      ctx.font = 'bold 7px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('IIT MADRAS', width - 70, 78);
-      ctx.fillText('PRAVARTAK', width - 70, 90);
-      ctx.fillText('SHAKTIDB', width - 70, 102);
-      ctx.fillText('VERIFIED 2026', width - 70, 114);
-      ctx.textAlign = 'left';
-
-      // 6. Time Validity Box (Soft Mint/Emerald Gradient Box)
-      const grad = ctx.createLinearGradient(36, 160, width - 72, 250);
-      grad.addColorStop(0, '#dcfce7');
-      grad.addColorStop(0.5, '#bbf7d0');
-      grad.addColorStop(1, '#d1fae5');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.roundRect(36, 160, width - 72, 105, 20);
-      ctx.fill();
-
-      // Top label in time box
-      ctx.fillStyle = '#166534';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Ticket is valid for workshop on Sat, Mar 14', width / 2, 185);
-
-      // Monospace Digital LED Clock Time
-      ctx.fillStyle = '#064e3b';
-      ctx.font = 'bold 44px monospace';
-      ctx.fillText('10 : 00', width / 2, 235);
-      ctx.textAlign = 'left';
-
-      // 7. QR Code Frame & Box
-      const qrSize = 250;
-      const qrX = (width - qrSize) / 2;
-      const qrY = 285;
-
-      ctx.fillStyle = '#f8fafc';
+      // Outer Border
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // 2. Left & Right Vertical Watermark Tracks: "• STUDENT PASS •"
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = 'bold 9px "Plus Jakarta Sans", sans-serif';
+      
+      // Left vertical track
+      ctx.save();
+      ctx.translate(16, height - 120);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('•  STUDENT PASS  •  STUDENT PASS  •  STUDENT PASS  •  STUDENT PASS  •  STUDENT PASS  •', 0, 0);
+      ctx.restore();
+
+      // Right vertical track
+      ctx.save();
+      ctx.translate(width - 10, height - 120);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('•  STUDENT PASS  •  STUDENT PASS  •  STUDENT PASS  •  STUDENT PASS  •  STUDENT PASS  •', 0, 0);
+      ctx.restore();
+
+      // Side Dotted Lines
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 18);
+      ctx.moveTo(28, 20);
+      ctx.lineTo(28, height - 20);
+      ctx.moveTo(width - 28, 20);
+      ctx.lineTo(width - 28, height - 20);
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset line dash
+
+      // 3. Top Left Close Button (✕)
+      ctx.fillStyle = '#f1f5f9';
+      ctx.beginPath();
+      ctx.arc(52, 46, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✕', 52, 50);
+
+      // 4. IIT Madras Seal & Brand Header
+      const sealX = 105;
+      const sealY = 46;
+      // Red seal circle
+      ctx.fillStyle = '#991b1b';
+      ctx.beginPath();
+      ctx.arc(sealX, sealY, 18, 0, Math.PI * 2);
+      ctx.fill();
+      // Inner gold ring
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(sealX, sealY, 15, 0, Math.PI * 2);
+      ctx.stroke();
+      // Center lamp flame
+      ctx.fillStyle = '#fef08a';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('🪔', sealX, sealY + 4);
+
+      // IIT Madras Text
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 16px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('IIT Madras', sealX + 26, sealY - 1);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '9px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Pravartak Technologies Foundation', sealX + 26, sealY + 12);
+
+      // 5. Top Right Holographic Official Student Pass Seal
+      const holoX = width - 68;
+      const holoY = 46;
+      const holoGrad = ctx.createLinearGradient(holoX - 22, holoY - 22, holoX + 22, holoY + 22);
+      holoGrad.addColorStop(0, '#bae6fd');
+      holoGrad.addColorStop(0.35, '#a7f3d0');
+      holoGrad.addColorStop(0.7, '#fbcfe8');
+      holoGrad.addColorStop(1, '#fde68a');
+
+      ctx.fillStyle = holoGrad;
+      ctx.beginPath();
+      ctx.arc(holoX, holoY, 22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Center Graduation Cap Icon
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🎓', holoX, holoY + 5);
+
+      // 6. Main Title: ShaktiDB Workshop
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#064e3b';
+      ctx.font = '900 24px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('ShaktiDB Workshop', width / 2, 108);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Powered by IIT Madras & ', width / 2 - 28, 128);
+      ctx.fillStyle = '#15803d';
+      ctx.fillText('ShaktiDB', width / 2 + 54, 128);
+
+      // 7. Student Metadata Row
+      const metaY = 154;
+      ctx.fillStyle = '#334155';
+      ctx.font = 'bold 10.5px "Plus Jakarta Sans", sans-serif';
+      const studentNameDisplay = (passData.name || 'Student').length > 14 ? `${passData.name.slice(0, 14)}...` : passData.name;
+      ctx.fillText(`📅 28/08/2026   |   👤 ${studentNameDisplay}   |   🆔 ${passData.ticketId.slice(0, 10)} 📋`, width / 2, metaY);
+
+      // 8. Mint-Green Countdown Box: "This pass is valid for 05 : 45 : 03"
+      const mintBoxY = 176;
+      const mintBoxW = width - 96;
+      const mintBoxH = 72;
+      const mintBoxX = 48;
+
+      const mintGrad = ctx.createLinearGradient(mintBoxX, mintBoxY, mintBoxX + mintBoxW, mintBoxY + mintBoxH);
+      mintGrad.addColorStop(0, '#ecfdf5');
+      mintGrad.addColorStop(1, '#e6f4ea');
+      ctx.fillStyle = mintGrad;
+      ctx.strokeStyle = '#a7f3d0';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect(mintBoxX, mintBoxY, mintBoxW, mintBoxH, 16);
       ctx.fill();
       ctx.stroke();
 
-      // Draw QR Pattern simulation
-      ctx.fillStyle = '#0f172a';
-      const drawFinder = (fx, fy) => {
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.roundRect(fx, fy, 48, 48, 8);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.roundRect(fx + 6, fy + 6, 36, 36, 6);
-        ctx.fill();
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.roundRect(fx + 14, fy + 14, 20, 20, 4);
-        ctx.fill();
-      };
+      ctx.fillStyle = '#166534';
+      ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('This pass is valid for', width / 2, mintBoxY + 22);
 
-      drawFinder(qrX, qrY);
-      drawFinder(qrX + qrSize - 48, qrY);
-      drawFinder(qrX, qrY + qrSize - 48);
+      // Digital 7-Segment Monospace Clock Font
+      ctx.fillStyle = '#064e3b';
+      ctx.font = '900 32px "JetBrains Mono", monospace';
+      ctx.fillText('05 : 45 : 03', width / 2, mintBoxY + 56);
 
-      // Matrix Data Dots Simulation
-      for (let r = 0; r < 17; r++) {
-        for (let c = 0; c < 17; c++) {
-          const isFinderArea = (r < 4 && c < 4) || (r < 4 && c > 12) || (r > 12 && c < 4);
-          const isCenter = r >= 6 && r <= 10 && c >= 6 && c <= 10;
-          if (!isFinderArea && !isCenter) {
-            if ((r * 7 + c * 13 + (passData.ticketId.charCodeAt(c % passData.ticketId.length) || 0)) % 2 === 0) {
-              ctx.fillStyle = '#0f172a';
-              ctx.fillRect(qrX + c * 14 + 7, qrY + r * 14 + 7, 9, 9);
+      // 9. Real High-Density Scannable QR Code Frame
+      const qrSize = 210;
+      const qrX = (width - qrSize) / 2;
+      const qrY = 264;
+
+      const qrPayload = `https://shaktidb.iitm.ac.in/verify?ticket=${passData.ticketId}&student=${encodeURIComponent(passData.name)}&seat=WS13`;
+
+      try {
+        const qrMatrix = QRCode.create(qrPayload, { errorCorrectionLevel: 'M' });
+        const moduleCount = qrMatrix.modules.size;
+        const cellSize = qrSize / moduleCount;
+
+        // Draw Matrix Modules
+        for (let r = 0; r < moduleCount; r++) {
+          for (let c = 0; c < moduleCount; c++) {
+            const isFinder = (r < 8 && c < 8) || (r < 8 && c >= moduleCount - 8) || (r >= moduleCount - 8 && c < 8);
+            const isCenterArea = r >= Math.floor(moduleCount / 2) - 3 && r <= Math.floor(moduleCount / 2) + 3 && c >= Math.floor(moduleCount / 2) - 3 && c <= Math.floor(moduleCount / 2) + 3;
+
+            if (!isFinder && !isCenterArea && qrMatrix.modules.get(r, c)) {
+              ctx.fillStyle = '#064e3b';
+              ctx.beginPath();
+              ctx.roundRect(qrX + c * cellSize + 0.5, qrY + r * cellSize + 0.5, cellSize - 1, cellSize - 1, 1.5);
+              ctx.fill();
             }
           }
         }
+
+        // Custom High-Tech Stylized Finder Eyes in 3 Corners
+        const drawCyberEye = (fx, fy) => {
+          const eyeSize = 7 * cellSize;
+          ctx.fillStyle = '#064e3b';
+          ctx.beginPath();
+          ctx.roundRect(fx, fy, eyeSize, eyeSize, 8);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.roundRect(fx + cellSize, fy + cellSize, eyeSize - 2 * cellSize, eyeSize - 2 * cellSize, 5);
+          ctx.fill();
+          ctx.fillStyle = '#047857';
+          ctx.beginPath();
+          ctx.roundRect(fx + 2 * cellSize, fy + 2 * cellSize, eyeSize - 4 * cellSize, eyeSize - 4 * cellSize, 3);
+          ctx.fill();
+        };
+
+        drawCyberEye(qrX, qrY);
+        drawCyberEye(qrX + (moduleCount - 7) * cellSize, qrY);
+        drawCyberEye(qrX, qrY + (moduleCount - 7) * cellSize);
+
+      } catch (qrErr) {
+        console.warn('Canvas QR render notice:', qrErr);
       }
 
-      // Center Refresh/Database Emblem inside QR
+      // Center Rainbow Hologram Emblem inside QR
+      const qrCenterX = qrX + qrSize / 2;
+      const qrCenterY = qrY + qrSize / 2;
+      
+      const badgeGrad = ctx.createLinearGradient(qrCenterX - 20, qrCenterY - 20, qrCenterX + 20, qrCenterY + 20);
+      badgeGrad.addColorStop(0, '#38bdf8');
+      badgeGrad.addColorStop(0.5, '#4ade80');
+      badgeGrad.addColorStop(1, '#f43f5e');
+
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(qrX + qrSize / 2, qrY + qrSize / 2, 28, 0, Math.PI * 2);
+      ctx.arc(qrCenterX, qrCenterY, 22, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = badgeGrad;
+      ctx.lineWidth = 3;
       ctx.stroke();
 
-      ctx.fillStyle = '#15803d';
-      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#064e3b';
+      ctx.font = '900 14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('⚡', qrX + qrSize / 2, qrY + qrSize / 2 + 6);
+      ctx.fillText('⚡', qrCenterX, qrCenterY + 5);
       ctx.textAlign = 'left';
 
-      // 8. Pass ID & Pricing Bar
-      ctx.fillStyle = '#f1f5f9';
+      // 10. Bottom Workshop Card Container (WS- 13 & Illustration + Dark Green Banner)
+      const cardX = 48;
+      const cardY = 490;
+      const cardW = width - 96;
+      const cardH = 150;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.roundRect(36, 565, width - 72, 42, 12);
+      ctx.roundRect(cardX, cardY, cardW, cardH, 20);
       ctx.fill();
-
-      ctx.fillStyle = '#334155';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillText(`💻 ${passData.ticketId} | Student Pass`, 48, 591);
-
-      ctx.fillStyle = '#15803d';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText('₹ 0 (Free)', width - 48, 591);
-      ctx.textAlign = 'left';
-
-      // 9. Route & Location Details
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText(`👤 ${passData.name}`, 48, 638);
-
-      ctx.fillStyle = '#475569';
-      ctx.font = '12px sans-serif';
-      ctx.fillText(`🏛️ ${passData.college || 'Engineering Institute'} (${passData.year})`, 48, 660);
-      ctx.fillText(`📞 ${passData.contactNo} • 📧 ${passData.email}`, 48, 680);
-
-      // Route Arrow
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(48, 705);
-      ctx.lineTo(width - 48, 705);
       ctx.stroke();
 
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('📍 Virtual Sandbox Lab  ➔  IIT Madras Central Node', 48, 728);
+      // Top-Left Pill Badge: 🎓 Student Pass
+      ctx.fillStyle = '#064e3b';
+      ctx.beginPath();
+      ctx.roundRect(cardX + 14, cardY + 12, 105, 24, 8);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🎓 Student Pass', cardX + 66, cardY + 28);
 
-      // 10. Bottom Banner
+      // Large WS- 13 Text
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('WS-', cardX + 14, cardY + 66);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 30px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('13', cardX + 40, cardY + 70);
+
+      // Right Classroom Illustration Drawing
+      const illusX = cardX + cardW - 155;
+      const illusY = cardY + 10;
+
+      // Whiteboard with ShaktiDB Logo
       ctx.fillStyle = '#f8fafc';
-      ctx.strokeStyle = '#e2e8f0';
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(illusX + 50, illusY + 4, 70, 42);
+      ctx.fillStyle = '#064e3b';
+      ctx.font = 'bold 8.5px sans-serif';
+      ctx.fillText('⚡ ShaktiDB', illusX + 56, illusY + 28);
+
+      // Instructor Figure
+      ctx.fillStyle = '#064e3b';
+      ctx.beginPath();
+      ctx.arc(illusX + 38, illusY + 16, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(illusX + 33, illusY + 23, 10, 22);
+      ctx.strokeStyle = '#064e3b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(illusX + 43, illusY + 26);
+      ctx.lineTo(illusX + 54, illusY + 20);
+      ctx.stroke();
+
+      // 4 Seated Students
+      const studentColors = ['#0f766e', '#15803d', '#047857', '#065f46'];
+      for (let s = 0; s < 4; s++) {
+        const sx = illusX + s * 22 + 10;
+        const sy = illusY + 50;
+        ctx.fillStyle = studentColors[s];
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(sx - 3.5, sy + 5.5, 7, 11);
+      }
+
+      // Bottom Dark Emerald Banner inside Card: ✔ Official Student Pass & SDB2504
+      const bannerY = cardY + cardH - 60;
+      const bannerH = 60;
+      ctx.fillStyle = '#064e3b';
+      ctx.beginPath();
+      ctx.roundRect(cardX, bannerY, cardW, bannerH, [0, 0, 20, 20]);
+      ctx.fill();
+
+      // Top Text in banner
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 10.5px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('✔  Official Student Pass', cardX + 16, bannerY + 20);
+
+      // Large White ID: SDB2504
+      const passCode = `SDB${passData.ticketId.replace(/\D/g, '').slice(-4) || '2504'}`;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 26px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(passCode, cardX + 16, bannerY + 47);
+
+      // Right ShaktiDB Logo & Text in Banner
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 17px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('⚡ ShaktiDB', cardX + cardW - 16, bannerY + 40);
+      ctx.textAlign = 'left';
+
+      // 11. Organized by & Powered by Footer
+      const footY = 665;
+      ctx.textAlign = 'center';
+      
+      // Organized by IIT Madras
+      ctx.fillStyle = '#64748b';
+      ctx.font = '9.5px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Organized by', width / 2 - 80, footY);
+      ctx.fillStyle = '#991b1b';
+      ctx.fillText('🪔', width / 2 - 110, footY + 18);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('IIT Madras', width / 2 - 70, footY + 18);
+
+      // Vertical Divider
+      ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(36, 755, width - 72, 85, 14);
-      ctx.fill();
+      ctx.moveTo(width / 2, footY - 4);
+      ctx.lineTo(width / 2, footY + 22);
       ctx.stroke();
 
+      // Powered by ShaktiDB
       ctx.fillStyle = '#64748b';
-      ctx.font = '11px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('This ticket is also valid in', width / 2, 780);
-
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'black 16px sans-serif';
-      ctx.fillText('ONE OR ALL WORKSHOP SESSIONS & LABS', width / 2, 805);
-
+      ctx.font = '9.5px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Powered by', width / 2 + 80, footY);
       ctx.fillStyle = '#15803d';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('INSTITUTE OF NATIONAL IMPORTANCE • IIT MADRAS', width / 2, 825);
-      ctx.textAlign = 'left';
+      ctx.fillText('⚡', width / 2 + 48, footY + 18);
+      ctx.fillStyle = '#064e3b';
+      ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('ShaktiDB', width / 2 + 84, footY + 18);
 
-      // 11. Footer note
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('ShaktiDB™ Sovereign Database Initiative • Powered by IIT Madras & MeitY', width / 2, 870);
-      ctx.fillText(`Dispatched from Admissions Desk: +91 96779 65133 to Student: ${passData.phoneNumber || passData.contactNo}`, width / 2, 888);
+      // 12. Bottom Disclaimer
+      ctx.fillStyle = '#64748b';
+      ctx.font = '9.5px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('ⓘ  Pass valid only for registered student on above ID', width / 2, 712);
 
+      const dataUrl = canvas.toDataURL('image/png');
       canvas.toBlob((blob) => {
         if (blob) {
           const url = URL.createObjectURL(blob);
-          resolve({ blob, url });
+          resolve({ blob, url, dataUrl });
         }
       }, 'image/png');
     });
@@ -459,9 +608,10 @@ _Department of CSE, IIT Madras & Pravartak Foundation_`;
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.email.trim() || !formData.contactNo.trim()) {
+    const studentPhoneInput = (formData.phoneNumber || formData.contactNo || '').trim();
+    if (!formData.name.trim() || !formData.email.trim() || !studentPhoneInput) {
       if (onShowToast) {
-        onShowToast('Please fill in Name, Email and Contact Number', 'warning');
+        onShowToast('Please fill in Name, Email and WhatsApp Number', 'warning');
       }
       return;
     }
@@ -489,10 +639,22 @@ _Department of CSE, IIT Madras & Pravartak Foundation_`;
       setRegisteredPass(passData);
       setSeatsLeft(prev => Math.max(1, prev - 1));
 
-      // Generate Image
+      let generatedDataUrl = null;
+      // Generate Image & QR
       try {
-        const { blob, url } = await generateTicketCanvasImage(passData);
+        const { blob, url, dataUrl } = await generateTicketCanvasImage(passData);
         setGeneratedImageUrl(url);
+        generatedDataUrl = dataUrl;
+
+        const qrData = await QRCode.toDataURL(`https://shaktidb.iitm.ac.in/verify?ticket=${ticketId}&student=${encodeURIComponent(passData.name)}`, {
+          errorCorrectionLevel: 'H',
+          margin: 1,
+          color: {
+            dark: '#064e3b',
+            light: '#ffffff'
+          }
+        });
+        setPassQrUrl(qrData);
       } catch (err) {
         console.error('Image generation error:', err);
       }
@@ -510,7 +672,7 @@ _Department of CSE, IIT Madras & Pravartak Foundation_`;
 
         // Silent background dispatch via WhatsApp automation server
         try {
-          fetch('/api/send-whatsapp-pass', {
+          fetch(API_ENDPOINTS.sendPass, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -518,14 +680,18 @@ _Department of CSE, IIT Madras & Pravartak Foundation_`;
               studentName: passData.name,
               ticketId: passData.ticketId,
               message: studentMessage,
-              passImageBase64: url
+              passImageBase64: generatedDataUrl
             })
           })
             .then(res => res.json())
             .then(data => {
               console.log('⚡ Direct WhatsApp Dispatch result:', data);
-              if (onShowToast) {
-                onShowToast(`✅ Pass image & confirmation dispatched directly to student (+${targetStudentPhone})!`, 'success');
+              if (data.success) {
+                if (onShowToast) {
+                  onShowToast(`✅ Pass image & confirmation delivered directly to student (+${targetStudentPhone})!`, 'success');
+                }
+              } else {
+                console.warn('Dispatch note:', data.message);
               }
             })
             .catch(err => {
@@ -597,7 +763,7 @@ _Department of CSE, IIT Madras & Pravartak Foundation_`;
 
       // 1. First attempt silent backend API dispatch
       try {
-        const response = await fetch('/api/send-whatsapp-pass', {
+        const response = await fetch(API_ENDPOINTS.sendPass, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -788,22 +954,7 @@ Execution Time: 0.84 ms`
 
           {/* Action & Theme Toggle */}
           <div className="flex items-center gap-2.5">
-            {/* WhatsApp Gateway Status / Link Button */}
-            <button
-              onClick={() => setIsQrModalOpen(true)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border ${
-                whatsappGatewayStatus === 'READY'
-                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
-                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-              }`}
-              title="WhatsApp Automation Gateway Status"
-            >
-              <span className={`w-2 h-2 rounded-full ${whatsappGatewayStatus === 'READY' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-              <span className="hidden sm:inline">
-                {whatsappGatewayStatus === 'READY' ? 'WhatsApp Gateway Active' : 'Link WhatsApp (+91 96779 65133)'}
-              </span>
-              <Smartphone className="w-3.5 h-3.5" />
-            </button>
+
 
             <button
               onClick={toggleTheme}
@@ -881,90 +1032,151 @@ Execution Time: 0.84 ms`
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 pt-2">
                 <button
                   onClick={() => scrollToSection('register-form')}
-                  className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 font-bold text-sm shadow-lg shadow-emerald-600/25 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-600/25 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
                 >
-                  <Ticket className="w-4 h-4" />
+                  <Ticket className="w-5 h-5" />
                   <span>Register Free Pass</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-5 h-5" />
                 </button>
-
-                <a
-                  href={`https://wa.me/${ORGANIZER_WHATSAPP}?text=${encodeURIComponent('Hi ShaktiDB Team! I have questions regarding the upcoming student database workshop.')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2"
-                >
-                  <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>Admissions Desk WhatsApp</span>
-                </a>
               </div>
 
               <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center lg:justify-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Pass auto-dispatched from Admissions (+91 96779 65133) to Student's WhatsApp</span>
+                <span>Pass auto-dispatched directly to Student's WhatsApp</span>
               </p>
             </div>
 
-            {/* Right Col: Simple Clean Countdown Card */}
+            {/* Right Col: Ultra-Premium Redesigned Countdown & Quick Perks Card */}
             <div className="lg:col-span-5">
-              <div className="rounded-3xl bg-white dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-xl space-y-5">
+              <div className="relative group">
                 
-                <div className="text-center space-y-1 border-b border-slate-100 dark:border-slate-800 pb-4">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-red-200 dark:border-red-500/30">
-                    <Clock className="w-3.5 h-3.5" /> Event Starts In
-                  </span>
+                {/* Ambient dynamic back glow */}
+                <div className="absolute -inset-1 rounded-[32px] bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 opacity-20 blur-xl group-hover:opacity-30 transition-opacity duration-300" />
 
-                  <div className="grid grid-cols-4 gap-2 pt-3">
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center">
-                      <span className="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                        {String(timeLeft.days).padStart(2, '0')}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Days</span>
+                <div className="relative rounded-[28px] bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-800 p-6 sm:p-7 shadow-2xl space-y-5 backdrop-blur-2xl">
+                  
+                  {/* Countdown Header */}
+                  <div className="text-center space-y-3 pb-2 border-b border-slate-100 dark:border-slate-800/80">
+                    
+                    {/* Live Event Starts In Pill */}
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-black bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-sky-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span>EVENT STARTS IN</span>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center">
-                      <span className="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                        {String(timeLeft.hours).padStart(2, '0')}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Hours</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center">
-                      <span className="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                        {String(timeLeft.minutes).padStart(2, '0')}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Mins</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center">
-                      <span className="block text-xl sm:text-2xl font-black text-cyan-600 dark:text-cyan-400 font-mono">
-                        {String(timeLeft.seconds).padStart(2, '0')}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Secs</span>
+
+                    {/* High-Tech 4-Grid Digital Clock */}
+                    <div className="grid grid-cols-4 gap-2.5">
+                      <div className="p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800/80 text-center shadow-inner hover:border-emerald-500/40 transition-colors">
+                        <span className="block text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                          {String(timeLeft.days).padStart(2, '0')}
+                        </span>
+                        <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500">Days</span>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800/80 text-center shadow-inner hover:border-teal-500/40 transition-colors">
+                        <span className="block text-2xl sm:text-3xl font-black text-teal-600 dark:text-teal-400 font-mono tracking-tight">
+                          {String(timeLeft.hours).padStart(2, '0')}
+                        </span>
+                        <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500">Hours</span>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800/80 text-center shadow-inner hover:border-sky-500/40 transition-colors">
+                        <span className="block text-2xl sm:text-3xl font-black text-sky-600 dark:text-sky-400 font-mono tracking-tight">
+                          {String(timeLeft.minutes).padStart(2, '0')}
+                        </span>
+                        <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500">Mins</span>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800/80 text-center shadow-inner hover:border-indigo-500/40 transition-colors">
+                        <span className="block text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+                          {String(timeLeft.seconds).padStart(2, '0')}
+                        </span>
+                        <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500">Secs</span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Redesigned Premium Bento Perks List */}
+                  <div className="space-y-2.5">
+                    
+                    {/* Perk 1: Certificate */}
+                    <div className="group/item flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/70 hover:border-emerald-500/50 dark:hover:border-emerald-500/40 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-all duration-200 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-sm group-hover/item:scale-105 transition-transform">
+                          <Award className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <h5 className="font-extrabold text-xs sm:text-[13px] text-slate-900 dark:text-white tracking-tight leading-snug">
+                            Official IIT Madras Pravartak Certificate
+                          </h5>
+                          <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                            Verified Signed Digital Credential
+                          </p>
+                        </div>
+                      </div>
+                      <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase">
+                        Verified
+                      </span>
+                    </div>
+
+                    {/* Perk 2: Cloud Sandbox */}
+                    <div className="group/item flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/70 hover:border-sky-500/50 dark:hover:border-sky-500/40 hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-all duration-200 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-sky-500/10 dark:bg-sky-500/20 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 shadow-sm group-hover/item:scale-105 transition-transform">
+                          <Cpu className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <h5 className="font-extrabold text-xs sm:text-[13px] text-slate-900 dark:text-white tracking-tight leading-snug">
+                            30-Day Free Cloud Sandbox Lab Credits
+                          </h5>
+                          <p className="text-[10px] font-bold text-sky-700 dark:text-sky-400">
+                            Hands-on PostgreSQL RISC-V Cluster
+                          </p>
+                        </div>
+                      </div>
+                      <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-sky-100 dark:bg-sky-950 text-[10px] font-black text-sky-800 dark:text-sky-300 uppercase">
+                        30-Days
+                      </span>
+                    </div>
+
+                    {/* Perk 3: WhatsApp Pass */}
+                    <div className="group/item flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/70 hover:border-purple-500/50 dark:hover:border-purple-500/40 hover:bg-purple-50/40 dark:hover:bg-purple-950/20 transition-all duration-200 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 shadow-sm group-hover/item:scale-105 transition-transform">
+                          <Smartphone className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <h5 className="font-extrabold text-xs sm:text-[13px] text-slate-900 dark:text-white tracking-tight leading-snug">
+                            Instant Image Pass sent to Student WhatsApp
+                          </h5>
+                          <p className="text-[10px] font-bold text-purple-700 dark:text-purple-400">
+                            High-Res e-Pass Dispatched Directly
+                          </p>
+                        </div>
+                      </div>
+                      <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950 text-[10px] font-black text-purple-800 dark:text-purple-300 uppercase">
+                        Instant
+                      </span>
+                    </div>
+
+                  </div>
+
+                  {/* Primary CTA Button */}
+                  <div className="pt-2">
+                    <button
+                      onClick={() => scrollToSection('register-form')}
+                      className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Zap className="w-4 h-4" />
+                      <span>Claim Free Student Pass</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 mt-2 font-medium">
+                      100% Free Sponsored • Direct WhatsApp Pass Attachment
+                    </p>
+                  </div>
+
                 </div>
-
-                {/* Quick Perks */}
-                <div className="space-y-2.5 text-xs">
-                  <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80">
-                    <Award className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Official IIT Madras Pravartak Certificate</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80">
-                    <Cpu className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">30-Day Free Cloud Sandbox Lab Credits</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80">
-                    <Smartphone className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Instant Image Pass sent to Student WhatsApp</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => scrollToSection('register-form')}
-                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20"
-                >
-                  <span>Claim Free Student Pass</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
 
@@ -1182,59 +1394,85 @@ Execution Time: 0.84 ms`
         </div>
       </section>
 
-      {/* STUDENT REGISTRATION FORM */}
+      {/* STUDENT REGISTRATION FORM (REDESIGNED ULTRA-MODERN CONSOLE) */}
       <section id="register-form" className="py-16 relative">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* Form Left Details */}
-            <div className="lg:col-span-5 space-y-4 text-center lg:text-left">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-                <Ticket className="w-3.5 h-3.5" /> Student Registration
-              </span>
+            {/* Form Left Bento Details */}
+            <div className="lg:col-span-5 space-y-5 text-center lg:text-left">
+              
+              {/* Active Badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>ADMISSIONS 2026 ACTIVE • IIT MADRAS</span>
+              </div>
 
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white leading-tight">
-                Get Your Live Digital Workshop Pass
-              </h2>
-
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                Fill in your details below to generate your personalized mobile e-pass with live QR code, verified IIT Madras stamp, and automatic pass delivery to your WhatsApp.
-              </p>
-
-              {/* Notification Details Badge */}
-              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-900 dark:text-emerald-300 space-y-1.5">
-                <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300">
-                  <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>Sender ➔ Receiver Routing</span>
-                </div>
-                <p className="text-[11px] text-slate-700 dark:text-slate-300">
-                  <strong>From:</strong> Admissions Desk (<strong>+91 96779 65133</strong>)<br/>
-                  <strong>To:</strong> Student's WhatsApp Number (Provided in form)
+              <div className="space-y-2">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white leading-tight">
+                  Join 2,500+ Students in Database Research
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Master PostgreSQL kernel internals, RISC-V hardware security enclaves, and native vector AI search in a 1-day immersive hands-on lab.
                 </p>
               </div>
 
-              <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300 pt-1">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>Direct WhatsApp pass delivery to student</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>Downloadable PNG image pass with live QR code</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>Official Certificate of Completion</span>
+              {/* 3-Step Journey Timeline Card */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Your 3-Step Journey</span>
+                </h4>
+
+                <div className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-black flex items-center justify-center shrink-0 text-xs">
+                      1
+                    </div>
+                    <div>
+                      <strong className="text-slate-900 dark:text-white block font-bold">1-Click Registration</strong>
+                      <span className="text-[11px] text-slate-500">Instant verification & track allocation</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400 font-black flex items-center justify-center shrink-0 text-xs">
+                      2
+                    </div>
+                    <div>
+                      <strong className="text-slate-900 dark:text-white block font-bold">Direct WhatsApp e-Pass</strong>
+                      <span className="text-[11px] text-slate-500">Official pass with QR code delivered to student number</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 font-black flex items-center justify-center shrink-0 text-xs">
+                      3
+                    </div>
+                    <div>
+                      <strong className="text-slate-900 dark:text-white block font-bold">IIT Madras Certification</strong>
+                      <span className="text-[11px] text-slate-500">Live hands-on lab sandbox + verified certificate</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+
+
+              {/* Seats Pill */}
+              <div className="flex items-center justify-center lg:justify-start gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                <Flame className="w-4 h-4 text-amber-500" />
+                <span>Only <strong className="text-slate-900 dark:text-white">{seatsLeft} Free Seats</strong> remaining in this batch</span>
+              </div>
+
             </div>
 
             {/* Form Right Card (Upgraded Ultra-Modern Form UI) */}
             <div className="lg:col-span-7">
               <div className="relative group">
-                {/* Glow ring */}
-                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 opacity-20 blur-xl group-hover:opacity-30 transition-opacity" />
+                {/* Ambient glow */}
+                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 opacity-25 blur-2xl group-hover:opacity-35 transition-opacity" />
 
                 <div className="relative rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-800 p-6 sm:p-8 backdrop-blur-2xl shadow-2xl space-y-6">
                   
@@ -1242,12 +1480,12 @@ Execution Time: 0.84 ms`
                   <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
-                          Direct Student Admission
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                          Student Admission Console
                         </span>
-                        <span className="text-[10px] font-bold text-slate-400">100% Free Sponsored</span>
+                        <span className="text-[10px] font-bold text-slate-400">Sponsored by IIT Madras</span>
                       </div>
-                      <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
                         Student Masterclass Registration
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1255,7 +1493,7 @@ Execution Time: 0.84 ms`
                       </p>
                     </div>
 
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 shadow-sm">
                       <Ticket className="w-6 h-6" />
                     </div>
                   </div>
@@ -1266,7 +1504,7 @@ Execution Time: 0.84 ms`
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Full Name */}
                       <div>
-                        <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                           Student Full Name <span className="text-emerald-600 dark:text-emerald-400">*</span>
                         </label>
                         <div className="relative">
@@ -1285,8 +1523,8 @@ Execution Time: 0.84 ms`
 
                       {/* Email Address */}
                       <div>
-                        <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                          Email Address <span className="text-emerald-600 dark:text-emerald-400">*</span>
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                          College / Personal Email <span className="text-emerald-600 dark:text-emerald-400">*</span>
                         </label>
                         <div className="relative">
                           <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1303,114 +1541,74 @@ Execution Time: 0.84 ms`
                       </div>
                     </div>
 
-                    {/* Section 2: Contact & WhatsApp Phone Number */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Contact No */}
-                      <div>
-                        <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                          Mobile / Contact No <span className="text-emerald-600 dark:text-emerald-400">*</span>
-                        </label>
-                        <div className="relative flex items-center">
-                          <span className="absolute left-3 text-xs font-bold text-slate-500 dark:text-slate-400 pointer-events-none">
-                            🇮🇳 +91
-                          </span>
-                          <input
-                            type="tel"
-                            name="contactNo"
-                            required
-                            maxLength={10}
-                            value={formData.contactNo}
-                            onChange={handleContactChange}
-                            placeholder="98765 43210"
-                            className="w-full pl-16 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-mono outline-none transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      {/* WhatsApp Phone Number */}
-                      <div>
-                        <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                          <span>Student WhatsApp Number <span className="text-emerald-600 dark:text-emerald-400">*</span></span>
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold lowercase">pass destination</span>
-                        </label>
-                        <div className="relative flex items-center">
-                          <span className="absolute left-3 text-xs font-bold text-slate-500 dark:text-slate-400 pointer-events-none">
-                            🇮🇳 +91
-                          </span>
-                          <input
-                            type="tel"
-                            name="phoneNumber"
-                            required
-                            maxLength={10}
-                            value={formData.phoneNumber}
-                            onChange={handleInputChange}
-                            placeholder="98765 43210"
-                            className="w-full pl-16 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-mono outline-none transition-all"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 3: College & Year of Study */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* College Name */}
-                      <div>
-                        <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                          College / University Name
-                        </label>
-                        <div className="relative">
-                          <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <input
-                            type="text"
-                            name="college"
-                            value={formData.college}
-                            onChange={handleInputChange}
-                            placeholder="e.g. Anna University / IIT / NIT"
-                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-medium outline-none transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Year of Study */}
-                      <div>
-                        <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                          Year of Study
-                        </label>
-                        <div className="relative">
-                          <GraduationCap className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <select
-                            name="year"
-                            value={formData.year}
-                            onChange={handleInputChange}
-                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 text-slate-900 dark:text-white text-xs sm:text-sm font-medium outline-none transition-all cursor-pointer"
-                          >
-                            <option value="1st Year B.Tech / B.E">1st Year B.Tech / B.E</option>
-                            <option value="2nd Year B.Tech / B.E">2nd Year B.Tech / B.E</option>
-                            <option value="3rd Year B.Tech / B.E">3rd Year B.Tech / B.E</option>
-                            <option value="4th Year (Final Year)">4th Year (Final Year)</option>
-                            <option value="Postgraduate / MCA / M.Tech">Postgraduate / MCA / M.Tech</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 4: Workshop Track */}
+                    {/* Section 2: Student WhatsApp Phone Number */}
                     <div>
-                      <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                        Selected Masterclass Track
+                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span>Student WhatsApp Number <span className="text-emerald-600 dark:text-emerald-400">*</span></span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold lowercase">Direct Pass Destination</span>
                       </label>
-                      <select
-                        name="interest"
-                        value={formData.interest}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 text-slate-900 dark:text-white text-xs sm:text-sm font-medium outline-none transition-all cursor-pointer"
-                      >
-                        <option value="PostgreSQL Internals & Query Engine">1. PostgreSQL Engine Internals (Query Planners & Buffer Caching)</option>
-                        <option value="ShaktiDB RISC-V Hardware Acceleration">2. ShaktiDB RISC-V Hardware Enclaves & Cryptography</option>
-                        <option value="AI Vector Databases (pg_shaktivector)">3. AI Vector Databases & RAG Pipelines (pg_shaktivector)</option>
-                        <option value="Complete All-Access Masterclass Pass">4. All Tracks (Complete Full-Day Masterclass Pass)</option>
-                      </select>
+                      <div className="relative flex items-center">
+                        <span className="absolute left-3 text-xs font-bold text-slate-500 dark:text-slate-400 pointer-events-none">
+                          🇮🇳 +91
+                        </span>
+                        <input
+                          type="tel"
+                          name="phoneNumber"
+                          required
+                          maxLength={10}
+                          value={formData.phoneNumber || formData.contactNo}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setFormData(prev => ({ ...prev, phoneNumber: val, contactNo: val }));
+                          }}
+                          placeholder="98765 43210"
+                          className="w-full pl-16 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-mono outline-none transition-all"
+                        />
+                      </div>
                     </div>
+
+                    {/* Section 3: College Name */}
+                    <div>
+                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        College / Institute Name
+                      </label>
+                      <div className="relative">
+                        <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          name="college"
+                          value={formData.college}
+                          onChange={handleInputChange}
+                          placeholder="e.g. Anna University / IIT Madras / NIT / PSG Tech"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-medium outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section 4: Year / Professional Status (Interactive Pill Radio Selector) */}
+                    <div>
+                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        Year of Study / Status
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {['1st Year', '2nd Year', '3rd Year', 'Final Year', 'PG / MCA', 'Working Professional'].map((yr) => (
+                          <button
+                            type="button"
+                            key={yr}
+                            onClick={() => setFormData(prev => ({ ...prev, year: yr }))}
+                            className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                              formData.year === yr
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
+                                : 'bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-emerald-500/50'
+                            }`}
+                          >
+                            {yr}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+
 
                     {/* Single-Click Submit Action (Direct Register & Send) */}
                     <div className="pt-3">
@@ -1426,8 +1624,8 @@ Execution Time: 0.84 ms`
                           </>
                         ) : (
                           <>
-                            <MessageSquare className="w-5 h-5" />
-                            <span>Register & Send Pass to WhatsApp</span>
+                            <Zap className="w-5 h-5" />
+                            <span>Confirm Registration & Get WhatsApp Pass</span>
                             <ArrowRight className="w-5 h-5" />
                           </>
                         )}
@@ -1435,7 +1633,7 @@ Execution Time: 0.84 ms`
                     </div>
 
                     <p className="text-[11px] text-center text-slate-500 dark:text-slate-400">
-                      ⚡ 1-Click Direct Registration: Your official ticket pass image and Zoom lab link are dispatched directly to your WhatsApp number.
+                      ⚡ 1-Click Direct Delivery: High-Res digital student pass and Zoom credentials dispatched directly to your WhatsApp.
                     </p>
 
                   </form>
@@ -1454,161 +1652,199 @@ Execution Time: 0.84 ms`
             
             <div className="text-center space-y-1">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                <Sparkles className="w-3.5 h-3.5" /> Pass Generated & Ready for Student Dispatch
+                <Sparkles className="w-3.5 h-3.5" /> Pass Generated & Dispatched to Student
               </span>
               <h2 className="text-2xl font-black text-white">
                 Official Student Workshop Pass
               </h2>
               <p className="text-xs text-slate-300">
-                Dispatched from Admissions Desk (<strong>+91 96779 65133</strong>) to Student WhatsApp (<strong>{registeredPass.phoneNumber || registeredPass.contactNo}</strong>)
+                Dispatched directly to Student WhatsApp (<strong>{registeredPass.phoneNumber || registeredPass.contactNo}</strong>)
               </p>
             </div>
 
-            {/* Mobile Phone Mockup Pass (Exact design matching user image) */}
-            <div className="relative mx-auto max-w-[380px] bg-white text-slate-900 rounded-[38px] p-5 shadow-2xl border-4 border-slate-800 overflow-hidden font-sans">
+            {/* Mobile Phone Card Pass (Exact replica of new uploaded template) */}
+            <div className="relative mx-auto max-w-[400px] bg-white text-slate-900 rounded-[36px] p-6 shadow-2xl border border-slate-200 overflow-hidden font-sans space-y-4">
               
-              {/* Phone Camera Notch */}
-              <div className="w-28 h-4 bg-slate-900 rounded-b-xl mx-auto mb-3 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-slate-700 ml-8" />
+              {/* Left and Right Watermark Vertical Borders */}
+              <div className="absolute left-1.5 top-12 bottom-12 flex flex-col items-center justify-around pointer-events-none opacity-40 select-none">
+                <span className="text-[8px] font-black text-slate-400 -rotate-90 tracking-widest uppercase">STUDENT PASS</span>
+                <span className="text-[8px] font-black text-slate-400 -rotate-90 tracking-widest uppercase">STUDENT PASS</span>
+                <span className="text-[8px] font-black text-slate-400 -rotate-90 tracking-widest uppercase">STUDENT PASS</span>
+              </div>
+              <div className="absolute right-1.5 top-12 bottom-12 flex flex-col items-center justify-around pointer-events-none opacity-40 select-none">
+                <span className="text-[8px] font-black text-slate-400 rotate-90 tracking-widest uppercase">STUDENT PASS</span>
+                <span className="text-[8px] font-black text-slate-400 rotate-90 tracking-widest uppercase">STUDENT PASS</span>
+                <span className="text-[8px] font-black text-slate-400 rotate-90 tracking-widest uppercase">STUDENT PASS</span>
               </div>
 
-              {/* Pass Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  {/* LIVE pill badge */}
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-600 text-white mb-2 shadow-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                    <span>LIVE</span>
-                  </span>
-                  
-                  <h4 className="text-xs font-black tracking-tight text-slate-900 uppercase">
-                    COMBO WORKSHOP PASS
-                  </h4>
-                  <p className="text-[11px] font-bold text-slate-600">
-                    மாணவர் அனுமதி சீட்டு
-                  </p>
+              {/* Side dashed border lines */}
+              <div className="absolute left-6 top-6 bottom-6 border-l border-dashed border-slate-200 pointer-events-none" />
+              <div className="absolute right-6 top-6 bottom-6 border-r border-dashed border-slate-200 pointer-events-none" />
+
+              {/* Top Header: Close Button + IIT Madras + Hologram Seal */}
+              <div className="relative px-3 flex items-center justify-between">
+                {/* Close ✕ */}
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs font-black shadow-inner">
+                  ✕
                 </div>
 
-                {/* Round Official Stamp / Seal (Top Right) */}
-                <div className="w-16 h-16 rounded-full border-2 border-slate-300 p-0.5 flex flex-col items-center justify-center text-[7px] font-black text-slate-500 text-center leading-tight shadow-inner">
-                  <div className="w-full h-full rounded-full border border-dashed border-slate-300 flex flex-col items-center justify-center">
-                    <span className="text-[8px] text-slate-700">IIT MADRAS</span>
-                    <span className="text-emerald-700 text-[6px]">PRAVARTAK</span>
-                    <span className="text-[6px]">SHAKTIDB</span>
+                {/* IIT Madras Emblem & Text */}
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-full bg-red-800 border border-amber-300 p-1 flex items-center justify-center text-amber-200 shadow-sm text-sm">
+                    🪔
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 leading-tight">IIT Madras</h4>
+                    <p className="text-[8px] text-slate-500 font-medium">Indian Institute of Technology</p>
+                  </div>
+                </div>
+
+                {/* Hologram Official Pass Seal */}
+                <div className="relative w-11 h-11 rounded-full bg-gradient-to-tr from-sky-200 via-emerald-200 via-pink-200 to-amber-200 p-0.5 shadow-sm flex items-center justify-center">
+                  <div className="w-full h-full rounded-full bg-white/40 backdrop-blur-sm flex flex-col items-center justify-center text-emerald-800 font-black">
+                    <span className="text-[6px] tracking-tighter uppercase font-bold text-emerald-700">OFFICIAL</span>
+                    <span className="text-xs">🎓</span>
                   </div>
                 </div>
               </div>
 
-              {/* Mint Green Gradient Validity Time Box */}
-              <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-100 via-emerald-200/80 to-teal-100 border border-emerald-300/60 text-center space-y-1 shadow-sm">
-                <div className="flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-900">
-                  <span>Ticket is valid for workshop on</span>
-                  <Info className="w-3 h-3 text-emerald-700" />
-                </div>
-                {/* Large Monospace Time Display */}
-                <div className="text-3xl font-mono font-black text-emerald-950 tracking-wider">
-                  10 : 00
-                </div>
-                <div className="text-[10px] text-emerald-800 font-semibold">
-                  Sat, Mar 14, 2026 • Live Sync: {passLiveTime}
+              {/* Main Heading: ShaktiDB Workshop */}
+              <div className="text-center px-3 pt-1 space-y-0.5">
+                <h3 className="text-xl font-black text-emerald-950 tracking-tight">
+                  ShaktiDB Workshop
+                </h3>
+                <p className="text-[11px] text-slate-600 font-bold">
+                  Powered by IIT Madras & <span className="text-emerald-700 font-extrabold">ShaktiDB</span>
+                </p>
+              </div>
+
+              {/* Metadata Pill */}
+              <div className="mx-3 py-1.5 px-3 rounded-full bg-slate-50 border border-slate-200 text-center text-[10px] font-bold text-slate-600 flex items-center justify-between">
+                <span>📅 28/08/2026</span>
+                <span className="text-slate-300">|</span>
+                <span className="truncate max-w-[110px]">👤 {registeredPass.name}</span>
+                <span className="text-slate-300">|</span>
+                <span className="font-mono text-emerald-800">🆔 {registeredPass.ticketId.slice(0, 10)}</span>
+              </div>
+
+              {/* Mint Green Countdown Box */}
+              <div className="mx-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 text-center space-y-0.5 shadow-sm">
+                <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">
+                  This pass is valid for
+                </p>
+                <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-950 tracking-widest">
+                  05 : 45 : 03
                 </div>
               </div>
 
-              {/* Big Scannable Center QR Code with live refresh icon */}
-              <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center relative flex flex-col items-center justify-center">
-                <div className="relative p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-                  <QrCode className="w-48 h-48 text-slate-900" strokeWidth={1.4} />
+              {/* Centered High-Tech Scannable QR Code Frame */}
+              <div className="mx-3 p-4 rounded-2xl bg-slate-50/90 border border-slate-200/90 shadow-sm flex flex-col items-center justify-center relative">
+                
+                {/* Cyber Corner HUD Brackets */}
+                <div className="absolute top-2 left-2 w-3.5 h-3.5 border-t-2 border-l-2 border-emerald-600" />
+                <div className="absolute top-2 right-2 w-3.5 h-3.5 border-t-2 border-r-2 border-emerald-600" />
+                <div className="absolute bottom-2 left-2 w-3.5 h-3.5 border-b-2 border-l-2 border-emerald-600" />
+                <div className="absolute bottom-2 right-2 w-3.5 h-3.5 border-b-2 border-r-2 border-emerald-600" />
+
+                <div className="relative p-2 bg-white rounded-xl shadow-inner border border-slate-100 flex items-center justify-center">
+                  {passQrUrl ? (
+                    <img
+                      src={passQrUrl}
+                      alt="Student Pass QR Code"
+                      className="w-44 h-44 object-contain rounded-lg"
+                    />
+                  ) : (
+                    <QrCode className="w-44 h-44 text-slate-950" strokeWidth={1.4} />
+                  )}
                   
-                  {/* Center Refresh Symbol inside QR */}
-                  <div className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-white border-2 border-slate-900 shadow flex items-center justify-center text-emerald-600">
-                    <RotateCw className="w-5 h-5 animate-spin" style={{ animationDuration: '6s' }} />
+                  {/* Center Badge with Rainbow Border and 1 / ⚡ */}
+                  <div className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-white border-2 border-emerald-500 shadow-md flex items-center justify-center text-slate-900 font-black text-xs">
+                    <span className="bg-gradient-to-r from-sky-500 via-emerald-500 to-pink-500 bg-clip-text text-transparent font-black">⚡</span>
                   </div>
                 </div>
-                <p className="text-[10px] font-mono text-slate-500 mt-2">
-                  SCAN FOR INSTANT LAB VERIFICATION
+
+                <p className="text-[9px] font-mono font-bold text-slate-500 mt-2 tracking-wider">
+                  256-BIT ENCRYPTED SOVEREIGN PASS
                 </p>
               </div>
 
-              {/* Pass Route Bar */}
-              <div className="mt-3.5 p-2.5 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                  <Laptop className="w-4 h-4 text-amber-600" />
-                  <span className="font-mono">{registeredPass.ticketId}</span>
-                  <span className="text-slate-400">|</span>
-                  <span className="text-[11px] text-slate-600">Student Pass</span>
+              {/* Workshop Card Container with WS- 13 & Classroom Graphic */}
+              <div className="mx-3 rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
+                {/* Upper row: WS- 13 & Classroom Graphic */}
+                <div className="p-3 flex items-center justify-between">
+                  <div>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950 text-white text-[9px] font-bold">
+                      🎓 Student Pass
+                    </span>
+                    <div className="mt-1.5 flex items-baseline gap-1">
+                      <span className="text-xs font-bold text-slate-500">WS-</span>
+                      <span className="text-2xl font-black text-slate-900">13</span>
+                    </div>
+                  </div>
+
+                  {/* Classroom graphic simulation */}
+                  <div className="w-32 h-12 bg-slate-50 rounded-xl border border-slate-200 p-1 flex items-center justify-between text-[8px] text-slate-500">
+                    <div className="text-center font-bold text-emerald-900">
+                      <span>⚡ ShaktiDB</span>
+                      <div className="text-[7px] text-slate-400">Classroom Lab</div>
+                    </div>
+                    <div className="flex gap-0.5 text-emerald-800 text-xs">
+                      👥
+                    </div>
+                  </div>
                 </div>
-                <div className="font-black text-emerald-700 text-sm">
-                  ₹ 0 Free
+
+                {/* Dark Emerald Bottom Banner with SDB2504 */}
+                <div className="bg-[#064e3b] p-3 text-white flex items-center justify-between">
+                  <div>
+                    <p className="text-[9px] font-bold text-emerald-300 flex items-center gap-1">
+                      ✔ Official Student Pass
+                    </p>
+                    <p className="text-lg font-black tracking-tight font-mono text-white">
+                      SDB{registeredPass.ticketId.replace(/\D/g, '').slice(-4) || '2504'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-black tracking-tight flex items-center gap-1">
+                      ⚡ ShaktiDB
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Route & Student info */}
-              <div className="mt-3 space-y-1 text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                  <span>👤 {registeredPass.name}</span>
+              {/* Partners Footer */}
+              <div className="mx-3 pt-1 border-t border-slate-100 flex items-center justify-around text-[10px] text-slate-500">
+                <div className="text-center">
+                  <span className="text-[8px] text-slate-400 block">Organized by</span>
+                  <strong className="text-slate-800">🪔 IIT Madras</strong>
                 </div>
-                <div className="text-[11px] text-slate-600 truncate">
-                  🏛️ {registeredPass.college || 'Engineering College'} ({registeredPass.year})
-                </div>
-                <div className="text-[11px] text-slate-500 font-mono">
-                  📞 {registeredPass.phoneNumber || registeredPass.contactNo} • {registeredPass.email}
-                </div>
-                <div className="pt-1 text-[11px] font-bold text-emerald-800 flex items-center gap-1">
-                  <span>📍 Online Sandbox</span>
-                  <span className="text-slate-400">➔</span>
-                  <span>IIT Madras Cloud Cluster</span>
+                <div className="h-6 w-px bg-slate-200" />
+                <div className="text-center">
+                  <span className="text-[8px] text-slate-400 block">Powered by</span>
+                  <strong className="text-emerald-800">⚡ ShaktiDB</strong>
                 </div>
               </div>
 
-              {/* Bottom Validity Banner */}
-              <div className="mt-4 pt-3 border-t border-dashed border-slate-300 text-center space-y-1">
-                <p className="text-[10px] text-slate-500 uppercase font-semibold">
-                  This ticket is also valid in
-                </p>
-                <p className="text-xs font-black text-slate-900 tracking-tight">
-                  ONE OR ALL WORKSHOP SESSIONS & LABS
-                </p>
-                <p className="text-[9px] font-bold text-emerald-700">
-                  INSTITUTE OF NATIONAL IMPORTANCE • IIT MADRAS
-                </p>
-              </div>
+              {/* Disclaimer */}
+              <p className="text-[9px] text-center text-slate-400 font-medium">
+                ⓘ Pass valid only for registered student on above ID
+              </p>
 
             </div>
 
-            {/* Pass Actions: Send TO Student's WhatsApp & Image Download */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <button
-                onClick={handleSendToStudentWhatsApp}
-                disabled={isGeneratingImage}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>
-                  {isGeneratingImage
-                    ? 'Preparing Pass...'
-                    : `Send Pass to Student WhatsApp (${registeredPass.phoneNumber || registeredPass.contactNo})`}
-                </span>
-              </button>
-
+            {/* Pass Actions: Image Download */}
+            <div className="flex items-center justify-center pt-2">
               <button
                 onClick={handleDownloadPassImage}
                 disabled={isGeneratingImage}
-                className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow"
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-600/25 hover:scale-105 active:scale-95 transition-all cursor-pointer"
               >
-                <Download className="w-4 h-4 text-emerald-400" />
+                <Download className="w-4 h-4 text-emerald-300" />
                 <span>Download Pass (PNG Image)</span>
               </button>
             </div>
 
-            {/* Quick Organizer Copy button */}
-            <div className="text-center pt-1">
-              <button
-                onClick={handleSendToOrganizerWhatsApp}
-                className="text-xs text-slate-400 hover:text-emerald-400 underline transition-colors"
-              >
-                Send a registration log copy to Admissions (+91 96779 65133)
-              </button>
-            </div>
+
 
           </div>
         </section>
@@ -1658,12 +1894,65 @@ Execution Time: 0.84 ms`
       </section>
 
       {/* FOOTER */}
-      <footer className="py-10 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 ShaktiDB™ Initiative. Powered by IIT Madras Pravartak & PostgreSQL.</p>
-          <p className="flex items-center gap-2">
-            <span>Admissions Desk: <strong>+91 96779 65133</strong></span>
-          </p>
+      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-5 text-xs text-slate-500 dark:text-slate-400">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+            
+            {/* Left: Dual Brand Units */}
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
+              {/* Neekan Consulting LLP */}
+              <div className="flex items-center gap-2.5">
+                <div className="bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
+                  <img
+                    src="/neekan-logo.png"
+                    alt="Neekan Consulting LLP"
+                    className="h-5 w-auto object-contain"
+                  />
+                </div>
+                <div className="text-left">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs block leading-tight">
+                    Neekan Consulting LLP
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Enterprise Consulting & IT
+                  </span>
+                </div>
+              </div>
+
+              {/* Vertical Divider */}
+              <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-800" />
+
+              {/* UDU Labs */}
+              <div className="flex items-center gap-2.5">
+                <div className="bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
+                  <img
+                    src="/udu_labs.png"
+                    alt="UDU Labs"
+                    className="h-5 w-auto object-contain"
+                  />
+                </div>
+                <div className="text-left">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs block leading-tight">
+                    UDU Labs
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Innovation & Tech Studio
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Crafted with heart by AKILAN */}
+            <div className="md:text-right flex items-center justify-center md:justify-end gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
+              <span>Crafted with</span>
+              <Heart className="w-4 h-4 text-rose-500 fill-rose-500 animate-pulse shrink-0" />
+              <span>by</span>
+              <span className="font-extrabold text-slate-900 dark:text-white tracking-wider">
+                AKILAN
+              </span>
+            </div>
+
+          </div>
         </div>
       </footer>
 

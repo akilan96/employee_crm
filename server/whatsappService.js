@@ -7,10 +7,19 @@ import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, MessageMedia } = pkg;
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' }));
+
+// Root health check for Render.com
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ONLINE',
+    service: 'ShaktiDB Admissions WhatsApp Gateway',
+    timestamp: new Date().toISOString()
+  });
+});
 
 let isClientReady = false;
 let currentQrCodeDataUrl = null;
@@ -23,6 +32,10 @@ function createWhatsAppClient() {
       authStrategy: new LocalAuth({
         dataPath: path.join(os.tmpdir(), 'shaktidb_wwebjs_auth')
       }),
+      webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-js/main/dist/wppconnect-wa.js'
+      },
       puppeteer: {
         headless: true,
         args: [
@@ -32,8 +45,7 @@ function createWhatsAppClient() {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--disable-gpu',
-          '--unhandled-rejections=strict'
+          '--disable-gpu'
         ]
       }
     });
@@ -73,7 +85,7 @@ function createWhatsAppClient() {
     });
 
     client.initialize().catch((err) => {
-      console.warn('⚠️ WhatsApp Web client background init notice (Service remains active for HTTP queue):', err.message);
+      console.warn('⚠️ WhatsApp Web client background init notice:', err.message);
     });
   } catch (err) {
     console.warn('WhatsApp client creation notice:', err.message);
@@ -105,48 +117,65 @@ app.post('/api/send-whatsapp-pass', async (req, res) => {
   if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
   if (cleanPhone.startsWith('0') && cleanPhone.length === 11) cleanPhone = `91${cleanPhone.substring(1)}`;
 
-  const recipientJid = `${cleanPhone}@c.us`;
-
   console.log(`\n📤 [DIRECT DISPATCH] Sending pass directly to Student: ${studentName} (${cleanPhone}) from +91 96779 65133...`);
 
   if (isClientReady && client) {
     try {
-      // 1. Send Text
-      await client.sendMessage(recipientJid, message);
-
-      // 2. Send Image if provided
-      if (passImageBase64) {
-        const base64Data = passImageBase64.replace(/^data:image\/\w+;base64,/, '');
-        const media = new MessageMedia('image/png', base64Data, `ShaktiDB_Pass_${ticketId}.png`);
-        await client.sendMessage(recipientJid, media, {
-          caption: `🎟️ *Official Student Pass:* ${ticketId} for ${studentName}`
-        });
+      // 1. Resolve registered WhatsApp JID
+      let recipientJid = `${cleanPhone}@c.us`;
+      try {
+        const numberId = await client.getNumberId(cleanPhone);
+        if (numberId && numberId._serialized) {
+          recipientJid = numberId._serialized;
+        }
+      } catch (numErr) {
+        console.warn('Number lookup notice:', numErr.message);
       }
 
-      console.log(`✅ [DISPATCH SUCCESS] Pass sent directly to ${cleanPhone}!`);
+      console.log(`🎯 Routing to WhatsApp JID: ${recipientJid}`);
+
+      // Send ONLY 1 Single Message (Directly attach pass image with full message caption)
+      if (passImageBase64) {
+        try {
+          const base64Data = passImageBase64.replace(/^data:image\/\w+;base64,/, '');
+          const media = new MessageMedia('image/png', base64Data, `ShaktiDB_Student_Pass_${ticketId}.png`);
+          await client.sendMessage(recipientJid, media, {
+            caption: message
+          });
+          console.log(`🖼️ Pass image with caption delivered as 1 single message to ${cleanPhone}!`);
+        } catch (imgErr) {
+          console.warn('Image send error, falling back to text:', imgErr.message);
+          await client.sendMessage(recipientJid, message);
+        }
+      } else {
+        const sendResult = await client.sendMessage(recipientJid, message);
+        console.log(`✅ Text message delivered to ${cleanPhone}! (ID: ${sendResult?.id?._serialized || 'OK'})`);
+      }
+
+      console.log(`🎉 [DISPATCH SUCCESS] Pass sent directly to ${cleanPhone}!`);
       return res.json({
         success: true,
         mode: 'DIRECT_WHATSAPP_WEB',
         recipient: cleanPhone,
-        message: 'Pass delivered directly to student without any user prompt!'
+        message: 'Pass delivered directly to student WhatsApp without any user prompt!'
       });
     } catch (err) {
-      console.error('WhatsApp send error:', err.message);
-      return res.json({
-        success: true,
-        mode: 'FALLBACK_QUEUED',
-        recipient: cleanPhone,
-        message: 'Dispatched via fallback gateway'
+      console.error('❌ WhatsApp direct send error:', err.message);
+      return res.status(500).json({
+        success: false,
+        mode: 'ERROR',
+        error: err.message,
+        recipient: cleanPhone
       });
     }
   } else {
-    console.log(`✅ [PROCESSED] Registration recorded for student ${cleanPhone}. Dispatch queue updated.`);
+    console.warn(`⚠️ WhatsApp Client not ready (Status: ${lastStatus}).`);
     return res.json({
-      success: true,
-      mode: 'QUEUED_LOCAL',
+      success: false,
+      mode: 'NOT_LINKED',
       status: lastStatus,
       recipient: cleanPhone,
-      message: 'Pass prepared and sent directly to student phone number without browser popup'
+      message: 'WhatsApp Gateway is not linked yet. Please scan the QR code to link +91 96779 65133.'
     });
   }
 });

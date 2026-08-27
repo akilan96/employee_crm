@@ -17,6 +17,7 @@ import LoginView from './components/LoginView';
 import SupabaseConfigModal from './components/SupabaseConfigModal';
 import ShaktiDBView from './components/ShaktiDBView';
 import EventLandingView from './components/EventLandingView';
+import WhatsAppConsoleView from './components/WhatsAppConsoleView';
 
 import { INITIAL_EMPLOYEES, DEPARTMENTS, BLOOD_GROUPS } from './data/employeesData';
 import {
@@ -100,6 +101,9 @@ export default function App() {
     }
     if (path === '/shaktidb' || path.startsWith('/shaktidb') || hash === '#/shaktidb' || hash.startsWith('#/shaktidb') || search === 'shaktidb') {
       return '/shaktidb';
+    }
+    if (path === '/whatsapp' || path.startsWith('/whatsapp') || hash === '#/whatsapp' || hash.startsWith('#/whatsapp') || search === 'whatsapp') {
+      return '/whatsapp';
     }
     return '/';
   };
@@ -532,6 +536,21 @@ export default function App() {
           theme={theme}
           toggleTheme={toggleTheme}
           onOpenDirectory={() => navigateTo('/')}
+          onShowToast={(msg, type) => showToast(msg, type)}
+        />
+        <ToastContainer toasts={toasts} />
+      </>
+    );
+  }
+
+  // Dedicated Route: If currentRoute is '/whatsapp', render the standalone WhatsApp Gateway Hub
+  if (currentRoute === '/whatsapp') {
+    return (
+      <>
+        <WhatsAppConsoleView
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onNavigate={(path) => navigateTo(path)}
           onShowToast={(msg, type) => showToast(msg, type)}
         />
         <ToastContainer toasts={toasts} />
@@ -1065,24 +1084,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right: Crafted with heart by AKILAN & ShaktiDB link */}
-            <div className="md:text-right flex flex-wrap items-center justify-center md:justify-end gap-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
-              <button
-                onClick={() => navigateTo('/shaktidb')}
-                className="text-cyan-600 dark:text-cyan-400 hover:underline font-semibold flex items-center gap-1 text-[11px]"
-              >
-                <span>⚡ ShaktiDB Sovereign UI Portal</span>
-                <span>→</span>
-              </button>
-              <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
-              <div className="flex items-center gap-1.5">
-                <span>Crafted with</span>
-                <Heart className="w-4 h-4 text-rose-500 fill-rose-500 animate-pulse shrink-0" />
-                <span>by</span>
-                <span className="font-extrabold text-slate-900 dark:text-white tracking-wider">
-                  AKILAN
-                </span>
-              </div>
+            {/* Right: Crafted with heart by AKILAN */}
+            <div className="md:text-right flex items-center justify-center md:justify-end gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
+              <span>Crafted with</span>
+              <Heart className="w-4 h-4 text-rose-500 fill-rose-500 animate-pulse shrink-0" />
+              <span>by</span>
+              <span className="font-extrabold text-slate-900 dark:text-white tracking-wider">
+                AKILAN
+              </span>
             </div>
           </div>
         </div>
