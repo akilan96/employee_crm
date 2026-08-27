@@ -42,8 +42,12 @@ function createWhatsAppClient() {
       authStrategy: new LocalAuth({
         dataPath: path.join(os.tmpdir(), 'shaktidb_wwebjs_auth')
       }),
+      webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-js/main/dist/wppconnect-wa.js'
+      },
       puppeteer: {
-        headless: true,
+        headless: 'new',
         ...(execPath ? { executablePath: execPath } : {}),
         args: [
           '--no-sandbox',
@@ -52,29 +56,22 @@ function createWhatsAppClient() {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--single-process',
           '--disable-gpu',
+          '--disable-software-rasterizer',
           '--disable-extensions',
-          '--disable-component-update',
+          '--mute-audio',
+          '--no-default-browser-check',
+          '--disable-features=IsolateOrigins,site-per-process,Translate,AcceptCHFrame,MediaRouter,OptimizationHints',
           '--disable-background-networking',
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
           '--disable-breakpad',
-          '--disable-client-side-phishing-detection',
-          '--disable-default-apps',
-          '--disable-hang-monitor',
-          '--disable-popup-blocking',
-          '--disable-prompt-on-repost',
+          '--disable-component-update',
+          '--disable-domain-reliability',
           '--disable-sync',
-          '--disable-translate',
           '--metrics-recording-only',
-          '--mute-audio',
-          '--no-default-browser-check',
-          '--safebrowsing-disable-auto-update',
-          '--enable-automation',
-          '--password-store=basic',
           '--use-mock-keychain',
-          '--js-flags=--max-old-space-size=128'
+          '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
       }
     });
