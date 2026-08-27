@@ -54,9 +54,34 @@ function createWhatsAppClient() {
           '--no-zygote',
           '--single-process',
           '--disable-gpu',
-          '--disable-extensions'
+          '--disable-extensions',
+          '--disable-component-update',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-breakpad',
+          '--disable-client-side-phishing-detection',
+          '--disable-default-apps',
+          '--disable-hang-monitor',
+          '--disable-popup-blocking',
+          '--disable-prompt-on-repost',
+          '--disable-sync',
+          '--disable-translate',
+          '--metrics-recording-only',
+          '--mute-audio',
+          '--no-default-browser-check',
+          '--safebrowsing-disable-auto-update',
+          '--enable-automation',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--js-flags=--max-old-space-size=128'
         ]
       }
+    });
+
+    client.on('loading_screen', (percent, message) => {
+      lastStatus = `SYNCING_${percent}%`;
+      console.log(`⏳ WhatsApp Web syncing: ${percent}% - ${message}`);
     });
 
     client.on('qr', async (qr) => {
@@ -111,6 +136,23 @@ function createWhatsAppClient() {
 
 // Start Client Safely
 createWhatsAppClient();
+
+// Restart WhatsApp Endpoint to generate fresh QR
+app.post('/api/restart-whatsapp', async (req, res) => {
+  try {
+    if (client) {
+      try {
+        await client.destroy();
+      } catch (e) {}
+    }
+    isClientReady = false;
+    currentQrCodeDataUrl = null;
+    createWhatsAppClient();
+    res.json({ success: true, message: 'WhatsApp client restarting for fresh QR code' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
 
 // Status Endpoint
 app.get('/api/whatsapp-status', (req, res) => {

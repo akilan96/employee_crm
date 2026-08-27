@@ -6,5 +6,6 @@ export const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$
 
 export const API_ENDPOINTS = {
   status: `${BACKEND_URL}/api/whatsapp-status`,
-  sendPass: `${BACKEND_URL}/api/send-whatsapp-pass`
+  sendPass: `${BACKEND_URL}/api/send-whatsapp-pass`,
+  restart: `${BACKEND_URL}/api/restart-whatsapp`
 };

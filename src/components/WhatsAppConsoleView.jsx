@@ -39,6 +39,7 @@ export default function WhatsAppConsoleView({ theme, toggleTheme, onNavigate, on
   const [registrations, setRegistrations] = useState([]);
   const [serverError, setServerError] = useState(null);
   const [resendingId, setResendingId] = useState(null);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   const fetchStatus = async () => {
     setIsRefreshing(true);
@@ -58,6 +59,24 @@ export default function WhatsAppConsoleView({ theme, toggleTheme, onNavigate, on
       setGatewayStatus('SERVER_OFFLINE');
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleRestartGateway = async () => {
+    setIsRestarting(true);
+    try {
+      if (onShowToast) onShowToast('Restarting WhatsApp daemon for fresh QR code...', 'info');
+      const res = await fetch(API_ENDPOINTS.restart, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setQrCodeData(null);
+        setGatewayStatus('LAUNCHING_BROWSER');
+        setTimeout(fetchStatus, 3000);
+      }
+    } catch (e) {
+      if (onShowToast) onShowToast(`Error: ${e.message}`, 'error');
+    } finally {
+      setIsRestarting(false);
     }
   };
 
@@ -316,6 +335,21 @@ export default function WhatsAppConsoleView({ theme, toggleTheme, onNavigate, on
                   <p className="text-[11px] text-slate-500">
                     Open WhatsApp ➔ Settings ➔ Linked Devices ➔ Link a Device
                   </p>
+
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleRestartGateway}
+                      disabled={isRestarting}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${isRestarting ? 'animate-spin' : ''}`} />
+                      <span>{isRestarting ? 'Generating Fresh QR...' : '🔄 Generate Fresh QR Code'}</span>
+                    </button>
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium max-w-xs mx-auto">
+                      💡 WhatsApp QR codes expire every 20-30s. If WhatsApp on your phone says "Couldn't link device", click the button above and scan within 15 seconds!
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 space-y-2 text-xs text-amber-900 dark:text-amber-300">
